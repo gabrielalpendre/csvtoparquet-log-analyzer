@@ -162,9 +162,15 @@ def analyze_column():
     col = params.get('column')
     query = params.get('jql_query', "").strip()
     df = apply_jql(current_df, query)
+    unique_count = int(df[col].nunique())
     counts = df[col].value_counts().head(50).to_dict()
     formatted_counts = [{"value": str(k), "count": int(v)} for k, v in counts.items()]
-    return jsonify({"column": col, "stats": formatted_counts, "total_rows": len(df)})
+    return jsonify({
+        "column": col, 
+        "stats": formatted_counts, 
+        "total_rows": len(df),
+        "unique_values": unique_count
+    })
 
 @app.route('/export', methods=['POST'])
 def export():
