@@ -2,6 +2,8 @@
 
 Uma aplicação web robusta desenvolvida com **Python (Flask)** e **Pandas** para análise de grandes volumes de dados. O projeto converte arquivos CSV para o formato **Parquet**, garantindo consultas ultra-rápidas e análise estatística em tempo real.
 
+![home](static/interface.png)
+
 ## Funcionalidades
 
 - **Conversão Automática:** Transforma CSVs pesados em arquivos Parquet otimizados.
@@ -34,6 +36,9 @@ Para rodar este projeto, você precisará das seguintes bibliotecas:
 
 3. **Acesse no navegador:**
    [http://127.0.0.1:5001](http://127.0.0.1:5001)
+
+4. **Baixe um arquivo para testes**
+   [https://www.datablist.com/learn/csv/download-sample-csv-files](https://www.datablist.com/learn/csv/download-sample-csv-files)
 
 ---
 
