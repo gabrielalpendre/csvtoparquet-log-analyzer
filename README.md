@@ -7,11 +7,12 @@ Uma aplicação web robusta desenvolvida com **Python (Flask)** e **Pandas** par
 ## Funcionalidades
 
 - **Conversão Automática:** Transforma CSVs pesados em arquivos Parquet otimizados.
-- **JQL (JSON Query Language):** Filtros avançados com suporte a operadores `=` (igual), `~` (contém), `AND` e `OR`.
-- **Análise de Colunas:** Distribuição de valores e frequências com um clique no cabeçalho.
+- **Upload ágil:** Realize upload apenas arrastando o arquivo para a tela.
+- **UI Responsiva:** Interface Dark Mode com painéis laterais retráteis e feedback visual de carregamento.
+- **Query JQL (JSON Query Language):** Filtros avançados com suporte a operadores `=` (igual), `~` (contém), `AND` e `OR`.
+- **Análise Quantitativa:** COntagem de valores e frequências com um clique no cabeçalho.
 - **Persistência:** Histórico de arquivos carregados com opção de renomear e excluir.
 - **Exportação:** Gere relatórios em Excel (.xlsx) baseados nos seus filtros atuais.
-- **UI Responsiva:** Interface Dark Mode com painéis laterais retráteis e feedback visual de carregamento.
 
 ---
 
@@ -29,7 +30,7 @@ Para rodar este projeto, você precisará das seguintes bibliotecas:
 ## Como Executar
 
 1. **Instale as dependências:**
-   `pip install flask pandas pyarrow openpyxl`
+   `pip install -r requirements.txt`
 
 2. **Inicie o servidor:**
    `python app.py`
@@ -37,7 +38,7 @@ Para rodar este projeto, você precisará das seguintes bibliotecas:
 3. **Acesse no navegador:**
    [http://127.0.0.1:5001](http://127.0.0.1:5001)
 
-4. **Baixe um arquivo para testes**
+4. **Realize um teste com um arquivo de exemplo**
    [https://www.datablist.com/learn/csv/download-sample-csv-files](https://www.datablist.com/learn/csv/download-sample-csv-files)
 
 ---
