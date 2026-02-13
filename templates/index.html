@@ -340,7 +340,16 @@ async function analyzeColumn(col) {
 }
 
 function quickFilter(col, val) {
-    document.getElementById('jqlInput').value = `${col} = "${val}"`;
+    const input = document.getElementById('jqlInput');
+    const currentQuery = input.value.trim();
+    
+    if (currentQuery === "") {
+        input.value = `${col} = "${val}"`;
+    } else {
+        input.value = `(${currentQuery}) AND ${col} = "${val}"`;
+    }
+    
+    currentPage = 1;
     fetchData();
 }
 

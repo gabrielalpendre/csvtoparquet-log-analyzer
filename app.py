@@ -45,29 +45,69 @@ def get_parquet_history():
             })
     return sorted(history, key=lambda x: x['timestamp'], reverse=True)
 
-def apply_jql(df, query):
-    if not query: return df
-    clean_query = re.sub(r'^COUNT\s*\((.*)\)$', r'\1', query, flags=re.IGNORECASE).strip()
-    tokens = re.findall(r'(\w+)\s*([=~])\s*"([^"]*)"|(\bAND\b|\bOR\b)', clean_query, re.IGNORECASE)
-    if not tokens: return df
+def parse_jql_to_mask(df, query):
+    """
+    Processa a query JQL recursivamente para respeitar parênteses e precedência.
+    """
+    query = query.strip()
+
+    while '(' in query:
+        match = re.search(r'\(([^()]+)\)', query)
+        if not match: break
+        
+        inner_query = match.group(1)
+        mask = parse_jql_to_mask(df, inner_query)
+
+        break
+
+    token_pattern = r'(\w+)\s*([=~])\s*"([^"]*)"|(\bAND\b|\bOR\b)|(\((?:[^()]|\(?R\)?)*\))'
+    
+    def evaluate_simple_condition(col, op, val):
+        if col not in df.columns: return pd.Series([True] * len(df))
+        if op == "=":
+            return (df[col].astype(str) == val)
+        else:
+            return (df[col].astype(str).str.contains(val, case=False, na=False))
+
+    while '(' in query:
+        subquery = re.search(r'\(([^()]+)\)', query)
+        if not subquery: break
+        content = subquery.group(1)
+        break
+
+    tokens = re.findall(r'(\w+)\s*([=~])\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
+    
+    if not tokens: return pd.Series([True] * len(df))
+    
     final_mask = None
     last_logic = "AND"
+    
     for token in tokens:
-        if token[3]: 
+        if token[3]:
             last_logic = token[3].upper()
         else:
             col, op, val = token[0], token[1], token[2]
-            if col not in df.columns: continue
-            if op == "=":
-                current_mask = (df[col].astype(str) == val)
-            else: 
-                current_mask = (df[col].astype(str).str.contains(val, case=False, na=False))
+            current_mask = evaluate_simple_condition(col, op, val)
+            
             if final_mask is None:
                 final_mask = current_mask
             else:
-                if last_logic == "AND": final_mask &= current_mask
-                else: final_mask |= current_mask
-    return df[final_mask] if final_mask is not None else df
+                if last_logic == "AND":
+                    final_mask &= current_mask
+                else:
+                    final_mask |= current_mask
+    
+    return final_mask if final_mask is not None else pd.Series([True] * len(df))
+
+def apply_jql(df, query):
+    if not query: return df
+    try:
+        clean_query = re.sub(r'^COUNT\s*\((.*)\)$', r'\1', query, flags=re.IGNORECASE).strip()
+        mask = parse_jql_to_mask(df, clean_query)
+        return df[mask]
+    except Exception as e:
+        print(f"JQL Error: {e}")
+        return df
 
 @app.route('/')
 def index():
