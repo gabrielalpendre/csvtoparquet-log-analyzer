@@ -6,12 +6,13 @@ Uma aplicação web robusta desenvolvida com **Python (Flask)** e **Pandas** par
 
 ## Funcionalidades
 
-- **Conversão Automática:** Transforma CSVs pesados em arquivos Parquet otimizados.
-- **Upload ágil:** Realize upload apenas arrastando o arquivo para a tela.
+- **Conversão Automática:** Transforma CSVs e XLSXs pesados em arquivos Parquet otimizados.
+- **Upload ágil:** Realize upload de arquivos CSV, XLSX ou Parquet apenas arrastando o arquivo para a tela.
 - **UI Responsiva:** Interface Dark Mode com painéis laterais retráteis e feedback visual de carregamento.
-- **Query JQL (JSON Query Language):** Filtros avançados com suporte a operadores `=` (igual), `~` (contém), `AND` e `OR`.
-- **Análise Quantitativa:** COntagem de valores e frequências com um clique no cabeçalho.
-- **Persistência:** Histórico de arquivos carregados com opção de renomear e excluir.
+- **Query JQL (JSON Query Language):** Filtros avançados com suporte a operadores `=` (igual), `~` (contém),  `!~` (não contém), `AND` e `OR`.
+- **Análise Quantitativa:** Contagem de valores e frequências com um clique no cabeçalho.
+- **Visualização de Performance:** Contagem de tempo para a importação do arquivo e tempo da execução do filtro.
+- **Persistência:** Histórico de arquivos carregados com opção de taguear com nomes e excluir.
 - **Exportação:** Gere relatórios em Excel (.xlsx) baseados nos seus filtros atuais.
 
 ---
@@ -49,6 +50,7 @@ Para rodar este projeto, você precisará das seguintes bibliotecas:
 | :--- | :--- | :--- |
 | `=` | Correspondência exata | `Status = "Concluído"` |
 | `~` | Contém o termo | `Nome ~ "Gabriel"` |
+| `!~` | Não contém o termo | `Nome !~ "John"` |
 | `AND` | Soma condições | `Setor = "TI" AND Salario ~ "5000"` |
 | `OR` | Várias condições | `Idate = "26" OR Idade = "25"` |
 | `( )` | Agrupamento | `Setor = "TI" AND (Idate = "26" OR Idade = "25")` |
