@@ -6,6 +6,7 @@ import os
 import re
 import io
 import json
+import time
 from datetime import datetime
 
 app = Flask(__name__)
@@ -60,14 +61,18 @@ def parse_jql_to_mask(df, query):
 
         break
 
-    token_pattern = r'(\w+)\s*([=~])\s*"([^"]*)"|(\bAND\b|\bOR\b)|(\((?:[^()]|\(?R\)?)*\))'
+    token_pattern = r'(\w+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)|(\((?:[^()]|\(?R\)?)*\))'
     
     def evaluate_simple_condition(col, op, val):
         if col not in df.columns: return pd.Series([True] * len(df))
         if op == "=":
             return (df[col].astype(str) == val)
-        else:
+        elif op == "~":
             return (df[col].astype(str).str.contains(val, case=False, na=False))
+        elif op == "!~":
+            return ~(df[col].astype(str).str.contains(val, case=False, na=False))
+        else:
+            return pd.Series([True] * len(df))
 
     while '(' in query:
         subquery = re.search(r'\(([^()]+)\)', query)
@@ -75,7 +80,7 @@ def parse_jql_to_mask(df, query):
         content = subquery.group(1)
         break
 
-    tokens = re.findall(r'(\w+)\s*([=~])\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
+    tokens = re.findall(r'(\w+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
     
     if not tokens: return pd.Series([True] * len(df))
     
@@ -147,31 +152,63 @@ def upload():
     global current_df, current_filename
     file = request.files.get('file')
     target_filename = request.form.get('filename')
+    import_time = 0
+    
     if file:
+        start_time = time.time()
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        if file_ext not in ['.csv', '.parquet', '.xlsx']:
+            return jsonify({"error": "Formato de arquivo não suportado. Use .csv, .parquet ou .xlsx"}), 400
+            
         base_name = os.path.splitext(file.filename)[0]
         parquet_path = os.path.join(UPLOAD_FOLDER, f"{base_name}.parquet")
-        if not os.path.exists(parquet_path):
-            temp_csv = os.path.join(UPLOAD_FOLDER, file.filename)
-            file.save(temp_csv)
-            reader = pd.read_csv(temp_csv, chunksize=500000, low_memory=False)
-            writer = None
-            for chunk in reader:
-                table = pa.Table.from_pandas(chunk)
-                if writer is None: writer = pq.ParquetWriter(parquet_path, table.schema)
-                writer.write_table(table)
-            if writer: writer.close()
-            os.remove(temp_csv)
+        
+        if file_ext == '.parquet':
+            file.save(parquet_path)
+        elif not os.path.exists(parquet_path):
+            temp_file = os.path.join(UPLOAD_FOLDER, file.filename)
+            file.save(temp_file)
+            
+            if file_ext == '.csv':
+                reader = pd.read_csv(temp_file, chunksize=500000, low_memory=False)
+                writer = None
+                for chunk in reader:
+                    table = pa.Table.from_pandas(chunk)
+                    if writer is None: writer = pq.ParquetWriter(parquet_path, table.schema)
+                    writer.write_table(table)
+                if writer: writer.close()
+            elif file_ext == '.xlsx':
+                df_excel = pd.read_excel(temp_file)
+                table = pa.Table.from_pandas(df_excel)
+                pq.write_table(table, parquet_path)
+                
+            os.remove(temp_file)
+            
         current_filename = f"{base_name}.parquet"
+        
+        path = os.path.join(UPLOAD_FOLDER, current_filename)
+        current_df = pd.read_parquet(path)
+        import_time = time.time() - start_time
     else:
         current_filename = target_filename
+        start_read = time.time()
+        path = os.path.join(UPLOAD_FOLDER, current_filename)
+        current_df = pd.read_parquet(path)
+        import_time = time.time() - start_read
+
     if not current_filename: return jsonify({"error": "Nenhum arquivo"}), 400
-    path = os.path.join(UPLOAD_FOLDER, current_filename)
-    current_df = pd.read_parquet(path)
+    
     for col in current_df.columns:
         if current_df[col].nunique() < 100000:
             current_df[col] = current_df[col].astype('category')
+        
     options = {col: current_df[col].dropna().unique().astype(str).tolist()[:50] for col in current_df.columns}
-    return jsonify({"columns": current_df.columns.tolist(), "options": options, "filename": current_filename})
+    return jsonify({
+        "columns": current_df.columns.tolist(), 
+        "options": options, 
+        "filename": current_filename,
+        "import_time": f"{import_time:.3f}s"
+    })
 
 @app.route('/fetch', methods=['POST'])
 def fetch_data():
@@ -181,9 +218,13 @@ def fetch_data():
     query = params.get('jql_query', "").strip()
     sort_col = params.get('sort_col')
     sort_dir = params.get('sort_dir', 'asc')
+    
+    start_time = time.time()
     df = apply_jql(current_df, query)
     if sort_col and sort_col in df.columns:
         df = df.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
+    filter_time = time.time() - start_time
+    
     total_count = len(df)
     page_size = 100
     start = (page - 1) * page_size
@@ -193,7 +234,12 @@ def fetch_data():
             if "" not in pdf[col].cat.categories: pdf[col] = pdf[col].cat.add_categories("")
             pdf[col] = pdf[col].fillna("")
         else: pdf[col] = pdf[col].fillna("")
-    return jsonify({"data": pdf.to_dict(orient='records'), "total_count": total_count})
+    
+    return jsonify({
+        "data": pdf.to_dict(orient='records'), 
+        "total_count": total_count,
+        "filter_time": f"{filter_time:.3f}s"
+    })
 
 @app.route('/analyze_column', methods=['POST'])
 def analyze_column():
