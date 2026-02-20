@@ -2,7 +2,7 @@
 
 O Log Analyzer Pro é uma plataforma avançada de análise de dados projetada para oferecer performance extrema, privacidade total e uma experiência de usuário premium. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
 
-![interface](static/interface.png)
+![interface](print/interface.png)
 
 ## Arquitetura e Fluxo de Dados
 
