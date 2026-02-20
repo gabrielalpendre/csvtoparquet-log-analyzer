@@ -1,0 +1,7 @@
+terraform {
+  backend "s3" {
+    bucket = "tf-accid"
+    key    = "path/ecs/svcname/terraform.tfstate"
+    region = "us-east-1"
+  }
+}

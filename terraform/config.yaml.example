@@ -1,0 +1,12 @@
+aws_region: "us-east-1"
+vpc_id: "vpc-aaaaaa
+subnet_ids:
+  - "subnet-xxxx
+  - "subnet-yyyy
+allow_cidr_lb:
+  - "10.100.0.0/16"
+alb_port: 80
+allow_cidr_ecs:
+  - "10.100.0.0/16"
+container_port: 8080
+app_name: "svc-name"
