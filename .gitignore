@@ -184,3 +184,4 @@ __marimo__/
 ## CUSTOM
 __pycache__
 uploads/
+flask_cache/

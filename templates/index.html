@@ -43,9 +43,9 @@
 
     body {
       background-color: var(--element-bg);
-      color: #eaeded;
+      color: #ffffff;
       font-family: 'Segoe UI', sans-serif;
-      font-size: 11px;
+      font-size: 13px;
       margin: 0;
       overflow: hidden;
       height: 100vh;
@@ -100,13 +100,14 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(255, 153, 0, 0.1);
-      border: 3px dashed var(--element-orange);
+      background: rgba(255, 153, 0, 0.4);
+      border: 4px dashed var(--element-orange);
       z-index: 9999;
       display: none;
       align-items: center;
       justify-content: center;
       pointer-events: none;
+      backdrop-filter: blur(4px);
     }
 
     #dropOverlay.active {
@@ -150,7 +151,7 @@
       border: none;
       color: #00f2fe;
       font-family: 'Courier New', monospace;
-      font-size: 13px;
+      font-size: 15px;
       flex: 1;
       padding: 8px;
       outline: none;
@@ -163,10 +164,11 @@
       border-radius: 3px;
       color: var(--element-orange);
       font-weight: bold;
-      font-size: 10px;
+      font-size: 12px;
       max-width: 180px;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .suggestions {
@@ -181,6 +183,8 @@
       margin-top: 5px;
       border-radius: 4px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      left: 10px;
+      top: 100%;
     }
 
     .suggestion-item {
@@ -235,17 +239,12 @@
       color: var(--element-orange);
       text-transform: uppercase;
       cursor: pointer;
-      font-size: 10px;
+      font-size: 12px;
       letter-spacing: 0.5px;
     }
 
     .fixed-table th:hover {
       background: #25313d !important;
-    }
-
-    .fixed-table th.analyzing {
-      border-top: 2px solid var(--element-orange);
-      color: white;
     }
 
     .stat-card {
@@ -255,10 +254,12 @@
       border-radius: 4px;
       margin-bottom: 5px;
       cursor: pointer;
+      transition: 0.2s;
     }
 
     .stat-card:hover {
       border-color: var(--element-orange);
+      transform: translateX(5px);
     }
 
     .stat-bar {
@@ -272,6 +273,8 @@
       border-left: 3px solid transparent;
       transition: 0.2s;
       position: relative;
+      cursor: pointer;
+      margin-bottom: 2px;
     }
 
     .history-item:hover {
@@ -284,24 +287,31 @@
     }
 
     .history-actions {
-      display: none;
+      visibility: hidden;
       gap: 8px;
-    }
-
-    .history-item:hover .history-actions {
       display: flex;
     }
 
-    .btn-excel {
-      color: #2ecc71;
-      border-color: #2ecc71;
-      font-size: 10px;
-      font-weight: bold;
+    .history-item:hover .history-actions {
+      visibility: visible;
     }
 
-    .btn-excel:hover {
-      background: #2ecc71;
-      color: white;
+    .timing-badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: #2b3948;
+      color: #ffffff;
+      border: 1px solid #414d5c;
+    }
+
+    .text-secondary {
+      color: #ffffff !important;
+    }
+
+    .timing-value {
+      color: var(--element-orange);
+      font-weight: bold;
     }
 
     .sidebar-trigger-area {
@@ -312,22 +322,8 @@
       height: 100%;
       z-index: 1001;
     }
-
-    .timing-badge {
-      font-size: 9px;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: #2b3948;
-      color: #aaa;
-      border: 1px solid #414d5c;
-    }
-
-    .timing-value {
-      color: var(--element-orange);
-      font-weight: bold;
-    }
   </style>
-  <title>CSV Analyzer Pro</title>
+  <title>Log Analyzer Pro</title>
 </head>
 
 <body class="sidebar-hidden">
@@ -335,8 +331,8 @@
   <div id="dropOverlay">
     <div class="text-center">
       <i class="bi bi-cloud-arrow-up-fill" style="font-size: 4rem; color: var(--element-orange);"></i>
-      <h3 class="text-white mt-3">SOLTE PARA IMPORTAR O ARQUIVO</h3>
-      <p class="text-secondary">(CSV, PARQUET ou XLSX)</p>
+      <h3 class="text-white mt-3">SOLTE PARA IMPORTAR</h3>
+      <p class="text-secondary">(Arquivos ficam locais no Navegador)</p>
     </div>
   </div>
 
@@ -345,16 +341,18 @@
   <div class="app-grid sidebar-hidden" id="appGrid">
     <aside class="sidebar" id="sidebar">
       <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
-        <strong class="text-warning">DATA SOURCES</strong>
+        <div>
+          <strong class="text-warning">LOCAL HISTORY</strong><br>
+          <small id="totalSizeDisplay" class="text-secondary" style="font-size: 11px;">Size: 0 MB</small>
+        </div>
         <button class="btn btn-sm text-secondary" onclick="toggleSidebar()"><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="p-2 overflow-auto flex-grow-1" id="historyList"></div>
       <div class="p-3 border-top border-secondary bg-dark">
         <label class="btn btn-sm btn-outline-warning w-100">
           <i class="bi bi-plus-lg"></i> UPLOAD FILE
-          <input type="file" id="csvFile" hidden accept=".csv,.parquet,.xlsx">
+          <input type="file" id="fileInput" hidden accept=".csv,.parquet,.xlsx">
         </label>
-        <div class="text-center mt-1" style="font-size: 8px; color: #666;">CSV, PARQUET, XLSX</div>
       </div>
     </aside>
 
@@ -362,58 +360,52 @@
       <header class="query-panel">
         <div class="d-flex align-items-center gap-2">
           <button class="menu-toggle" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
-          <div id="activeFileDisplay" class="file-badge">NO_FILE</div>
+          <div id="activeFileDisplay" class="file-badge">UNSET</div>
 
           <div class="jql-container flex-grow-1">
-            <span id="countDisplay" class="count-result"
-              style="background: #00f2fe; color: #000; padding: 2px 8px; border-radius: 10px; font-weight: bold; display: none; font-size: 10px;"></span>
-            <input type="text" id="jqlInput" class="jql-input" placeholder='Filtrar registros...' autocomplete="off"
-              onkeyup="handleJQL(event)">
+            <input type="text" id="jqlInput" class="jql-input" placeholder="Query JQL (i)" autocomplete="off">
 
-            <div class="d-flex gap-1">
-              <div id="importTimeDisplay" class="timing-badge" title="Tempo de Importação" style="display: none;">
-                import: <span class="timing-value">0s</span>
-              </div>
-              <div id="filterTimeDisplay" class="timing-badge" title="Tempo de Filtro" style="display: none;">
-                filter: <span class="timing-value">0s</span>
-              </div>
+            <div class="d-flex gap-1" id="timingContainer">
+              <div id="importTimeDisplay" class="timing-badge" style="display: none;">IMP: <span
+                  class="timing-value">0s</span></div>
+              <div id="filterTimeDisplay" class="timing-badge" style="display: none;">FLT: <span
+                  class="timing-value">0s</span></div>
             </div>
 
             <i class="bi bi-info-circle info-icon" data-bs-toggle="tooltip" data-bs-html="true" title="Sintaxe JQL: 
 ~ : Contém
 !~ : Não Contém
 = : Igual
-( ) : Agrupamento">
-            </i>
+( ) : Agrupamento"></i>
+
+            <div id="jqlSuggestions" class="suggestions shadow-lg"></div>
           </div>
 
-          <button class="btn btn-sm btn-outline-success btn-excel" onclick="exportToExcel()"><i
+          <button class="btn btn-sm btn-outline-success" onclick="exportToExcel()"><i
               class="bi bi-file-earmark-excel"></i> EXPORT</button>
           <button class="menu-toggle" onclick="toggleAnalyzer()"><i class="bi bi-graph-up"></i></button>
         </div>
-        <div id="jqlSuggestions" class="suggestions shadow-lg"></div>
       </header>
 
       <section class="table-area" id="tableContainer">
-        <div class="loader-overlay text-center" id="mainLoader"
-          style="display:none; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 2001;">
-          <div class="spinner-border text-warning" style="width: 3rem; height: 3rem;"></div>
-          <div class="mt-3 text-warning fw-bold h6">EXECUTING...</div>
+        <div id="mainLoader"
+          style="display:none; position: absolute; top:40%; left:50%; translate: -50% -50%; z-index: 2001;"
+          class="text-center text-warning">
+          <div class="spinner-border"></div>
+          <div class="mt-2 fw-bold">PROCESSING...</div>
         </div>
-        <table class="table table-dark fixed-table mb-0" id="mainTable">
+        <table class="table table-dark fixed-table mb-0">
           <thead id="headerRow"></thead>
           <tbody id="tableBody"></tbody>
         </table>
       </section>
 
-      <footer class="p-2 border-top border-secondary d-flex justify-content-between align-items-center bg-dark"
-        style="height: 40px;">
+      <footer class="p-2 border-top border-secondary d-flex justify-content-between align-items-center bg-dark">
         <div id="pageStats" class="text-secondary ps-2">Objects: 0</div>
         <div class="d-flex gap-3 align-items-center pe-2">
           <button class="btn btn-sm btn-outline-secondary py-0" onclick="changePage(-1)"><i
               class="bi bi-chevron-left"></i></button>
-          <span class="text-warning fw-bold" id="currentPageDisplay"
-            style="min-width: 20px; text-align: center;">1</span>
+          <span class="text-warning fw-bold" id="currentPageDisplay">1</span>
           <button class="btn btn-sm btn-outline-secondary py-0" onclick="changePage(1)"><i
               class="bi bi-chevron-right"></i></button>
         </div>
@@ -422,30 +414,20 @@
 
     <aside class="analyzer-panel" id="analyzerPanel">
       <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
-        <strong class="text-warning">VALUE DISTRIBUTION</strong>
+        <strong class="text-warning">DISTRIBUTION</strong>
         <button class="btn btn-sm text-secondary" onclick="toggleAnalyzer()"><i class="bi bi-x-lg"></i></button>
       </div>
-      <div class="p-3 bg-dark">
-        <div class="text-secondary mb-1" style="font-size: 9px;">SELECTED COLUMN / INFO</div>
-        <div class="d-flex justify-content-between align-items-center">
-          <div id="selectedColName" class="text-white fw-bold text-truncate" style="max-width: 140px;">Select a
-            column...</div>
-          <div id="uniqueCountWrapper" style="display: none;">
-            <span class="text-secondary" style="font-size: 9px; vertical-align: middle;">UNIQUES:</span>
-            <span id="uniqueCountBadge" class="badge bg-primary ms-1" style="font-size: 10px;">0</span>
-          </div>
-        </div>
+      <div id="selectedColDisplay"
+        class="p-2 border-bottom border-secondary bg-dark d-flex justify-content-between align-items-center">
+        <span id="selectedColName" class="text-truncate fw-bold">Select a column</span>
+        <span id="uniqueCountBadge" class="badge bg-warning text-dark" style="display:none">0</span>
       </div>
-      <div class="p-2 overflow-auto flex-grow-1" id="distributionList">
-        <div class="text-center text-secondary mt-5">
-          <i class="bi bi-bar-chart-line d-block fs-1 opacity-25"></i>
-          Click on a column header to analyze
-        </div>
-      </div>
+      <div class="p-2 overflow-auto flex-grow-1" id="distributionList"></div>
     </aside>
   </div>
 
   <script>
+    let currentSessionId = localStorage.getItem('last_session_id') || "";
     let currentFilename = "";
     let allColumns = [];
     let columnOptions = {};
@@ -453,291 +435,162 @@
     let sortState = { col: null, dir: 'asc' };
     let currentAnalyzedCol = null;
 
-    const body = document.querySelector('body');
-    const overlay = document.getElementById('dropOverlay');
+    // --- INDEXED DB ---
+    const dbName = "LogAnalyzerDB";
+    const storeName = "files";
+    let db;
 
-    const ALLOWED_EXTENSIONS = ['.csv', '.parquet', '.xlsx'];
-
-    body.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.add('active'); });
-    body.addEventListener('dragleave', (e) => { if (e.relatedTarget === null) overlay.classList.remove('active'); });
-    body.addEventListener('drop', (e) => {
-      e.preventDefault();
-      overlay.classList.remove('active');
-      const files = e.dataTransfer.files;
-      if (files.length > 0) handleFileUpload(files[0]);
-    });
-
-    window.onload = function () {
-      loadHistory();
-      setupSidebarHover();
-    };
-
-    function setupSidebarHover() {
-      const trigger = document.getElementById('sidebarTrigger');
-      const grid = document.getElementById('appGrid');
-      trigger.addEventListener('mouseenter', () => grid.classList.remove('sidebar-hidden'));
+    async function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 3);
+        request.onupgradeneeded = e => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName, { keyPath: "name" });
+        };
+        request.onsuccess = e => { db = e.target.result; resolve(db); };
+        request.onerror = e => reject(e.target.error);
+      });
     }
 
+    // --- DRAG AND DROP ---
+    const body = document.querySelector('body');
+    const overlay = document.getElementById('dropOverlay');
+    body.ondragover = e => { e.preventDefault(); overlay.classList.add('active'); };
+    body.ondragleave = e => { if (e.relatedTarget === null) overlay.classList.remove('active'); };
+    body.ondrop = e => { e.preventDefault(); overlay.classList.remove('active'); processUpload(e.dataTransfer.files[0]); };
+
+    // --- ACTIONS ---
     function toggleSidebar() { document.getElementById('appGrid').classList.toggle('sidebar-hidden'); }
     function toggleAnalyzer() { document.getElementById('appGrid').classList.toggle('analyzer-hidden'); }
 
     async function loadHistory() {
-      try {
-        const res = await fetch('/history').then(r => r.json());
-        document.getElementById('historyList').innerHTML = res.map(item => `
-      <div class="p-3 mb-1 history-item ${currentFilename === item.filename ? 'active' : ''}" 
-        onclick="loadData('${item.filename}')" style="cursor:pointer">
-        <div class="d-flex justify-content-between align-items-start">
-          <span class="text-truncate fw-bold text-warning" style="max-width: 160px;">${item.label}</span>
-          <div class="history-actions">
-            <i class="bi bi-pencil text-info" onclick="event.stopPropagation(); renameFile('${item.filename}', '${item.label}')"></i>
-            <i class="bi bi-trash text-danger" onclick="event.stopPropagation(); deleteFile('${item.filename}')"></i>
+      const tx = db.transaction(storeName, "readonly");
+      const req = tx.objectStore(storeName).getAll();
+      req.onsuccess = () => {
+        const files = req.result;
+        let totalSize = 0;
+        document.getElementById('historyList').innerHTML = files.map(f => {
+          totalSize += (f.blob ? f.blob.size : 0);
+          return `
+        <div class="p-3 mb-1 history-item ${currentFilename === f.name ? 'active' : ''}" onclick="loadFromHistory('${f.name}')">
+          <div class="d-flex justify-content-between align-items-start">
+            <span class="text-truncate fw-bold text-warning" style="max-width:160px">${f.tag || f.name}</span>
+            <div class="history-actions">
+              <i class="bi bi-tag text-info" onclick="event.stopPropagation(); renameTag('${f.name}')"></i>
+              <i class="bi bi-trash text-danger" onclick="event.stopPropagation(); deleteFile('${f.name}')"></i>
+            </div>
           </div>
+          <div style="font-size: 11px; color: #ffffff; margin-top:2px">${f.date} • ${(f.blob ? f.blob.size / (1024 * 1024) : 0).toFixed(2)} MB</div>
         </div>
-        <div class="mt-1" style="font-size: 9px; color: #666; font-family: monospace;">
-          ${item.filename}<br>${item.date} • ${item.size}
-        </div>
-      </div>
-    `).join('');
-      } catch (e) { console.warn("History error"); }
+      `;
+        }).join('');
+        document.getElementById('totalSizeDisplay').innerText = `Total: ${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+      };
     }
 
-    async function renameFile(filename, oldLabel) {
-      const newLabel = prompt("Novo nome para este arquivo:", oldLabel);
-      if (newLabel && newLabel !== oldLabel) {
-        await fetch('/update_label', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename, label: newLabel })
-        });
+    async function renameTag(name) {
+      const file = await getFile(name);
+      const current = file.tag || name;
+      const newTag = prompt("Nome customizado (Tag):", current);
+      if (newTag !== null) {
+        const tx = db.transaction(storeName, "readwrite");
+        file.tag = newTag;
+        const req = tx.objectStore(storeName).put(file);
+        tx.oncomplete = () => {
+          loadHistory();
+          if (currentFilename === name) {
+            document.getElementById('activeFileDisplay').innerText = newTag || name;
+          }
+        };
+      }
+    }
+
+    async function getFile(name) {
+      return new Promise(resolve => {
+        db.transaction(storeName, "readonly").objectStore(storeName).get(name).onsuccess = e => resolve(e.target.result);
+      });
+    }
+
+    async function deleteFile(name) {
+      if (!confirm(`Delete ${name}?`)) return;
+
+      // Limpa Cache Servidor
+      fetch('/delete_session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: currentSessionId })
+      });
+
+      const tx = db.transaction(storeName, "readwrite");
+      tx.objectStore(storeName).delete(name);
+
+      tx.oncomplete = () => {
+        if (currentFilename === name) {
+          // Limpa Estado
+          currentFilename = "";
+          allColumns = [];
+          columnOptions = {};
+          currentPage = 1;
+          currentAnalyzedCol = null;
+
+          // Limpa UI
+          document.getElementById('activeFileDisplay').innerText = "UNSET";
+          document.getElementById('headerRow').innerHTML = "";
+          document.getElementById('tableBody').innerHTML = "";
+          document.getElementById('pageStats').innerText = "Objects: 0";
+          document.getElementById('currentPageDisplay').innerText = "1";
+          document.getElementById('importTimeDisplay').style.display = 'none';
+          document.getElementById('filterTimeDisplay').style.display = 'none';
+          document.getElementById('appGrid').classList.add('analyzer-hidden');
+        }
         loadHistory();
-      }
+      };
     }
 
-    async function deleteFile(filename) {
-      if (confirm(`Deseja realmente excluir ${filename}?`)) {
-        await fetch('/delete_file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename })
-        });
-        if (currentFilename === filename) location.reload();
-        else loadHistory();
-      }
+    async function loadFromHistory(name) {
+      const file = await getFile(name);
+      if (file) processUpload(file.blob, true, name);
     }
 
-    function handleFileUpload(file) {
-      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        alert(`Erro: Formato de arquivo não suportado (${ext}).\nFormatos permitidos: ${ALLOWED_EXTENSIONS.join(', ')}`);
-        return;
-      }
+    async function processUpload(file, isHistory = false, historyName = "") {
+      if (!file) return;
+      setLoading(true);
       const formData = new FormData();
       formData.append('file', file);
-      processUpload(formData);
-    }
+      if (currentSessionId) formData.append('session_id', currentSessionId);
 
-    document.getElementById('csvFile').addEventListener('change', function () {
-      if (this.files[0]) handleFileUpload(this.files[0]);
-    });
-
-    async function processUpload(formData) {
-      setLoading(true);
       try {
-        const response = await fetch('/upload', { method: 'POST', body: formData });
-        const res = await response.json();
+        const res = await fetch('/upload', { method: 'POST', body: formData }).then(r => r.json());
+        if (res.error) throw new Error(res.error);
 
-        if (res.error) {
-          alert("Erro no upload: " + res.error);
-          return;
-        }
-
-        currentFilename = res.filename;
+        currentSessionId = res.session_id;
+        localStorage.setItem('last_session_id', currentSessionId);
+        currentFilename = historyName || file.name;
         allColumns = res.columns;
         columnOptions = res.options;
-        document.getElementById('activeFileDisplay').innerText = currentFilename;
 
-        // Mostra tempo de importação
-        const impDisplay = document.getElementById('importTimeDisplay');
-        impDisplay.querySelector('.timing-value').innerText = res.import_time;
-        impDisplay.style.display = 'block';
-        document.getElementById('filterTimeDisplay').style.display = 'none';
+        if (!isHistory) {
+          const tx = db.transaction(storeName, "readwrite");
+          tx.objectStore(storeName).put({ name: file.name, blob: file, date: new Date().toLocaleString(), tag: "" });
+        }
+
+        document.getElementById('activeFileDisplay').innerText = (await getFile(currentFilename))?.tag || currentFilename;
+        document.getElementById('importTimeDisplay').style.display = 'block';
+        document.getElementById('importTimeDisplay').querySelector('.timing-value').innerText = res.import_time;
 
         renderHeader();
         loadHistory();
         fetchData();
-      } catch (e) { alert("Upload error: " + e.message); }
+      } catch (e) { alert("Upload fail: " + e.message); }
       finally { setLoading(false); }
-    }
-
-    function loadData(filename) {
-      const formData = new FormData();
-      formData.append('filename', filename);
-      processUpload(formData);
     }
 
     function renderHeader() {
-      const head = document.getElementById('headerRow');
-      head.innerHTML = `<tr>${allColumns.map(col => `
+      document.getElementById('headerRow').innerHTML = `<tr>${allColumns.map(col => `
     <th onclick="analyzeColumn('${col}')" class="${currentAnalyzedCol === col ? 'analyzing' : ''}">
-      <div class="d-flex justify-content-between align-items-center">
-        <span>${col}</span>
-        <i class="bi bi-funnel" onclick="event.stopPropagation(); applySort('${col}')" style="font-size: 8px; opacity: 0.4"></i>
-      </div>
+      <span>${col}</span> <i class="bi bi-arrow-down-up float-end opacity-25" onclick="event.stopPropagation(); applySort('${col}')"></i>
     </th>
   `).join('')}</tr>`;
-    }
-
-    async function analyzeColumn(col) {
-      currentAnalyzedCol = col;
-      document.getElementById('selectedColName').innerText = col;
-      document.getElementById('appGrid').classList.remove('analyzer-hidden');
-      renderHeader();
-      const query = document.getElementById('jqlInput').value.trim();
-      const list = document.getElementById('distributionList');
-      const wrapper = document.getElementById('uniqueCountWrapper');
-      const badge = document.getElementById('uniqueCountBadge');
-
-      list.innerHTML = '<div class="text-center mt-5"><div class="spinner-border spinner-border-sm text-warning"></div></div>';
-      wrapper.style.display = 'none';
-
-      try {
-        const res = await fetch('/analyze_column', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ column: col, jql_query: query })
-        }).then(r => r.json());
-
-        badge.innerText = res.unique_values.toLocaleString();
-        wrapper.style.display = 'block';
-
-        const maxCount = res.stats.length > 0 ? res.stats[0].count : 1;
-        list.innerHTML = res.stats.map(item => {
-          const percentage = (item.count / res.total_rows * 100).toFixed(1);
-          const barWidth = (item.count / maxCount * 100);
-          return `<div class="stat-card" onclick="quickFilter('${col}', '${item.value}')">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="text-truncate" style="max-width: 160px;">${item.value || 'null'}</span>
-                    <span class="text-warning fw-bold">${item.count.toLocaleString()}</span>
-                </div>
-                <div class="stat-bar" style="width: ${barWidth}%"></div>
-            </div>`;
-        }).join('');
-      } catch (e) { list.innerHTML = 'Error'; }
-    }
-
-    function quickFilter(col, val) {
-      const input = document.getElementById('jqlInput');
-      const currentQuery = input.value.trim();
-
-      if (currentQuery === "") {
-        input.value = `${col} = "${val}"`;
-      } else {
-        input.value = `(${currentQuery}) AND ${col} = "${val}"`;
-      }
-
-      currentPage = 1;
-      fetchData();
-    }
-
-    function handleJQL(e) {
-      const input = e.target.value;
-      const sugBox = document.getElementById('jqlSuggestions');
-      if (e.key === 'Enter') {
-        sugBox.style.display = 'none';
-        currentPage = 1;
-        fetchData();
-        return;
-      }
-      let parts = input.split(/[\s()]+OR[\s()]+|[\s()]+AND[\s()]+|[()]/i);
-      let lastPart = parts.pop().trim();
-      const operators = ['=', '!~', '~'];
-      let currentOp = operators.find(op => lastPart.includes(op));
-      if (currentOp) {
-        const segments = lastPart.split(currentOp);
-        const colKey = segments[0].trim();
-        const searchPart = segments[1] ? segments[1].trim().replace(/['"]/g, '') : "";
-        showSuggestions(columnOptions[colKey] || [], searchPart, true, currentOp);
-      } else { showSuggestions(allColumns, lastPart, false); }
-    }
-
-    function showSuggestions(list, query, isValue, operator = '=') {
-      const sugBox = document.getElementById('jqlSuggestions');
-      const filtered = list.filter(i => String(i).toLowerCase().includes(query.toLowerCase())).slice(0, 10);
-      if (filtered.length > 0 && query !== "") {
-        sugBox.innerHTML = filtered.map(item => `
-      <div class="suggestion-item" onclick="applySuggestion('${item}', ${isValue}, '${operator}')">
-        ${isValue ? `<small class="text-secondary">Value:</small> <b>${item}</b>` : `<b>${item}</b>`}
-      </div>
-    `).join('');
-        sugBox.style.display = 'block';
-      } else { sugBox.style.display = 'none'; }
-    }
-
-    function applySuggestion(val, isValue, operator) {
-      const input = document.getElementById('jqlInput');
-      const text = input.value;
-      if (isValue) {
-        const lastOpIdx = Math.max(text.lastIndexOf('='), text.lastIndexOf('~'), text.lastIndexOf('!~'));
-        let opLen = 1;
-        if (text.substring(lastOpIdx - 1, lastOpIdx + 1) === '!~') opLen = 2; // Check if it's the 2-char operator
-        input.value = `${text.substring(0, lastOpIdx + 1)} "${val}" `;
-      } else {
-        const lastSpace = Math.max(text.lastIndexOf(' '), text.lastIndexOf('('));
-        input.value = `${text.substring(0, lastSpace + 1)}${val} = `;
-      }
-      document.getElementById('jqlSuggestions').style.display = 'none';
-      input.focus();
-    }
-
-    async function fetchData() {
-      if (!currentFilename) return;
-      const query = document.getElementById('jqlInput').value.trim();
-      setLoading(true);
-      try {
-        const resp = await fetch('/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: currentFilename, page: currentPage, jql_query: query, sort_col: sortState.col, sort_dir: sortState.dir })
-        });
-        const res = await resp.json();
-        document.getElementById('countDisplay').style.display = query.toUpperCase().startsWith("COUNT") ? 'inline-block' : 'none';
-        if (query.toUpperCase().startsWith("COUNT")) document.getElementById('countDisplay').innerText = `COUNT: ${res.total_count}`;
-        else {
-          document.getElementById('tableBody').innerHTML = res.data.map(row => `
-        <tr>${allColumns.map(col => `<td>${row[col] || ''}</td>`).join('')}</tr>
-      `).join('');
-        }
-
-        // Mostra tempo de filtro
-        const fltDisplay = document.getElementById('filterTimeDisplay');
-        fltDisplay.querySelector('.timing-value').innerText = res.filter_time;
-        fltDisplay.style.display = 'block';
-
-        document.getElementById('pageStats').innerText = `Objects: ${res.total_count.toLocaleString()}`;
-        document.getElementById('currentPageDisplay').innerText = currentPage;
-        if (currentAnalyzedCol) analyzeColumn(currentAnalyzedCol);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    }
-
-    async function exportToExcel() {
-      if (!currentFilename) return;
-      setLoading(true);
-      try {
-        const resp = await fetch('/export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: currentFilename, jql_query: document.getElementById('jqlInput').value })
-        });
-        const blob = await resp.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export_${currentFilename}.xlsx`;
-        a.click();
-      } catch (e) { alert("Export failed"); }
-      finally { setLoading(false); }
     }
 
     function applySort(col) {
@@ -746,15 +599,156 @@
       fetchData();
     }
 
-    function setLoading(v) {
-      document.getElementById('tableContainer').classList.toggle('loading', v);
-      document.getElementById('mainLoader').style.display = v ? 'block' : 'none';
+    async function fetchData() {
+      if (!currentSessionId) return;
+      const query = document.getElementById('jqlInput').value.trim();
+      setLoading(true);
+      try {
+        const res = await fetch('/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: currentSessionId, jql_query: query,
+            page: currentPage, sort_col: sortState.col, sort_dir: sortState.dir
+          })
+        }).then(r => r.json());
+
+        if (res.error) {
+          if (res.error.includes("expirada")) { loadFromHistory(currentFilename); return; }
+          throw new Error(res.error);
+        }
+
+        document.getElementById('tableBody').innerHTML = res.data.map(row => `
+      <tr>${allColumns.map(col => `<td>${row[col] || ''}</td>`).join('')}</tr>
+    `).join('');
+
+        document.getElementById('pageStats').innerText = `Total: ${res.total_count.toLocaleString()}`;
+        document.getElementById('filterTimeDisplay').style.display = 'block';
+        document.getElementById('filterTimeDisplay').querySelector('.timing-value').innerText = res.filter_time;
+        document.getElementById('currentPageDisplay').innerText = currentPage;
+
+        // Sincroniza coluna da direita se houver uma ativa
+        if (currentAnalyzedCol) analyzeColumn(currentAnalyzedCol, true);
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
     }
 
-    function changePage(s) {
-      currentPage = Math.max(1, currentPage + s);
+    async function analyzeColumn(col, skipHeader = false) {
+      currentAnalyzedCol = col;
+      document.getElementById('selectedColName').innerText = col;
+      if (!skipHeader) renderHeader();
+      const res = await fetch('/analyze_column', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: currentSessionId, column: col, jql_query: document.getElementById('jqlInput').value })
+      }).then(r => r.json());
+
+      document.getElementById('uniqueCountBadge').innerText = res.unique_values;
+      document.getElementById('uniqueCountBadge').style.display = 'block';
+      document.getElementById('distributionList').innerHTML = res.stats.map(s => `
+    <div class="stat-card" onclick="quickFilter('${col}', '${s.value}')">
+      <div class="d-flex justify-content-between small"><span>${s.value || 'null'}</span> <b>${s.count.toLocaleString()}</b></div>
+      <div class="stat-bar" style="width:${(s.count / res.total_rows * 100)}%"></div>
+    </div>
+  `).join('');
+      document.getElementById('appGrid').classList.remove('analyzer-hidden');
+    }
+
+    function quickFilter(col, val) {
+      const ipt = document.getElementById('jqlInput');
+      let q = ipt.value.trim();
+      const newCond = `${col} = "${val}"`;
+
+      if (q === "") {
+        ipt.value = newCond;
+      } else {
+        // Verifica se a coluna já existe em um grupo
+        const pattern = new RegExp(`\\((${col}\\s*!?~?=[^)]+)\\)`, 'i');
+        const match = q.match(pattern);
+
+        if (match) {
+          // Se já está agrupado, insere o OR dentro do grupo existente
+          ipt.value = q.replace(pattern, `($1 OR ${newCond})`);
+        } else if (new RegExp(`\\b${col}\\s*!?~?=`, 'i').test(q)) {
+          // Se existe sem parênteses, cria o grupo
+          const soloPattern = new RegExp(`(${col}\\s*!?~?=[^\\s]+(?:\\s*"[^"]*")?)`, 'i');
+          ipt.value = q.replace(soloPattern, `($1 OR ${newCond})`);
+        } else {
+          // Se é uma coluna nova, adiciona com AND
+          ipt.value = `(${q}) AND ${newCond}`;
+        }
+      }
+      currentPage = 1;
       fetchData();
     }
+
+    async function exportToExcel() {
+      if (!currentSessionId) return;
+      setLoading(true);
+      try {
+        const resp = await fetch('/export', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSessionId, jql_query: document.getElementById('jqlInput').value })
+        });
+        if (resp.status === 404) { alert("Session expired. Refreshing..."); loadFromHistory(currentFilename); return; }
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const fileData = await getFile(currentFilename);
+        const baseName = (fileData?.tag || currentFilename).split('.')[0];
+        const downloadName = `${baseName}_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadName;
+        a.click();
+      } finally { setLoading(false); }
+    }
+
+    // --- JQL SUGGESTIONS ---
+    document.getElementById('jqlInput').onkeyup = e => {
+      if (e.key === 'Enter') { document.getElementById('jqlSuggestions').style.display = 'none'; currentPage = 1; fetchData(); return; }
+      const val = e.target.value;
+      const sug = document.getElementById('jqlSuggestions');
+      let pts = val.split(/[\s()]+OR[\s()]+|[\s()]+AND[\s()]+|[()]/i);
+      let last = pts.pop().trim();
+      const ops = ['=', '!~', '~'];
+      let currentOp = ops.find(o => last.includes(o));
+      if (currentOp) {
+        const segs = last.split(currentOp);
+        showSuggestions(columnOptions[segs[0].trim()] || [], segs[1]?.trim().replace(/['"]/g, '') || "", true);
+      } else { showSuggestions(allColumns, last, false); }
+    };
+
+    function showSuggestions(list, q, isVal) {
+      const box = document.getElementById('jqlSuggestions');
+      const filtered = list.filter(i => String(i).toLowerCase().includes(q.toLowerCase())).slice(0, 10);
+      if (filtered.length > 0 && q !== "") {
+        box.innerHTML = filtered.map(i => `<div class='suggestion-item' onclick="applySug('${i}', ${isVal})"><b>${i}</b></div>`).join('');
+        box.style.display = 'block';
+      } else { box.style.display = 'none'; }
+    }
+
+    function applySug(v, isVal) {
+      const ipt = document.getElementById('jqlInput');
+      const t = ipt.value;
+      if (isVal) {
+        const lastIdx = Math.max(t.lastIndexOf('='), t.lastIndexOf('~'), t.lastIndexOf('!~'));
+        ipt.value = `${t.substring(0, lastIdx + 1)} "${v}" `;
+      } else {
+        const lastSpc = Math.max(t.lastIndexOf(' '), t.lastIndexOf('('));
+        ipt.value = `${t.substring(0, lastSpc + 1)}${v} = `;
+      }
+      document.getElementById('jqlSuggestions').style.display = 'none'; ipt.focus();
+    }
+
+    // --- INIT ---
+    const trigger = document.getElementById('sidebarTrigger');
+    trigger.onmouseenter = () => document.getElementById('appGrid').classList.remove('sidebar-hidden');
+    document.getElementById('fileInput').onchange = e => processUpload(e.target.files[0]);
+    function setLoading(v) { document.getElementById('tableContainer').classList.toggle('loading', v); document.getElementById('mainLoader').style.display = v ? 'block' : 'none'; }
+    function changePage(v) { currentPage = Math.max(1, currentPage + v); fetchData(); }
+
+    initDB().then(loadHistory);
   </script>
 </body>
 

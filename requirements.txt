@@ -2,3 +2,6 @@ Flask
 pandas
 pyarrow
 openpyxl
+cachelib
+fastparquet
+gunicorn

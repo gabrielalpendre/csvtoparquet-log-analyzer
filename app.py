@@ -7,61 +7,23 @@ import re
 import io
 import json
 import time
+import uuid
 from datetime import datetime
+from cachelib import FileSystemCache
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-METADATA_FILE = os.path.join(UPLOAD_FOLDER, 'metadata.json')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.secret_key = str(uuid.uuid4())
 
-current_df = None
-current_filename = None
-
-def get_metadata():
-    if os.path.exists(METADATA_FILE):
-        try:
-            with open(METADATA_FILE, 'r') as f:
-                return json.load(f)
-        except: return {}
-    return {}
-
-def save_metadata(metadata):
-    with open(METADATA_FILE, 'w') as f:
-        json.dump(metadata, f)
-
-def get_parquet_history():
-    if not os.path.exists(UPLOAD_FOLDER): return []
-    history = []
-    metadata = get_metadata()
-    for f in os.listdir(UPLOAD_FOLDER):
-        if f.endswith('.parquet'):
-            path = os.path.join(UPLOAD_FOLDER, f)
-            stats = os.stat(path)
-            history.append({
-                "filename": f,
-                "label": metadata.get(f, f),
-                "size": f"{stats.st_size / (1024*1024):.2f} MB",
-                "date": datetime.fromtimestamp(stats.st_ctime).strftime('%d/%m/%Y %H:%M'),
-                "timestamp": stats.st_ctime
-            })
-    return sorted(history, key=lambda x: x['timestamp'], reverse=True)
+cache = FileSystemCache('flask_cache', threshold=100, default_timeout=3600)
 
 def parse_jql_to_mask(df, query):
-    """
-    Processa a query JQL recursivamente para respeitar parênteses e precedência.
-    """
     query = query.strip()
-
     while '(' in query:
         match = re.search(r'\(([^()]+)\)', query)
         if not match: break
-        
         inner_query = match.group(1)
         mask = parse_jql_to_mask(df, inner_query)
-
         break
-
-    token_pattern = r'(\w+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)|(\((?:[^()]|\(?R\)?)*\))'
     
     def evaluate_simple_condition(col, op, val):
         if col not in df.columns: return pd.Series([True] * len(df))
@@ -74,34 +36,21 @@ def parse_jql_to_mask(df, query):
         else:
             return pd.Series([True] * len(df))
 
-    while '(' in query:
-        subquery = re.search(r'\(([^()]+)\)', query)
-        if not subquery: break
-        content = subquery.group(1)
-        break
-
     tokens = re.findall(r'(\w+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
-    
     if not tokens: return pd.Series([True] * len(df))
-    
     final_mask = None
     last_logic = "AND"
-    
     for token in tokens:
         if token[3]:
             last_logic = token[3].upper()
         else:
             col, op, val = token[0], token[1], token[2]
             current_mask = evaluate_simple_condition(col, op, val)
-            
             if final_mask is None:
                 final_mask = current_mask
             else:
-                if last_logic == "AND":
-                    final_mask &= current_mask
-                else:
-                    final_mask |= current_mask
-    
+                if last_logic == "AND": final_mask &= current_mask
+                else: final_mask |= current_mask
     return final_mask if final_mask is not None else pd.Series([True] * len(df))
 
 def apply_jql(df, query):
@@ -118,123 +67,76 @@ def apply_jql(df, query):
 def index():
     return render_template('index.html')
 
-@app.route('/history', methods=['GET'])
-def history():
-    return jsonify(get_parquet_history())
-
-@app.route('/update_label', methods=['POST'])
-def update_label():
-    params = request.json
-    filename = params.get('filename')
-    new_label = params.get('label')
-    if not filename: return jsonify({"status": "error"}), 400
-    meta = get_metadata()
-    meta[filename] = new_label
-    save_metadata(meta)
-    return jsonify({"status": "ok"})
-
-@app.route('/delete_file', methods=['POST'])
-def delete_file():
-    params = request.json
-    filename = params.get('filename')
-    path = os.path.join(UPLOAD_FOLDER, filename)
-    if os.path.exists(path):
-        os.remove(path)
-        meta = get_metadata()
-        if filename in meta:
-            del meta[filename]
-            save_metadata(meta)
-        return jsonify({"status": "ok"})
-    return jsonify({"status": "error"}), 404
-
 @app.route('/upload', methods=['POST'])
 def upload():
-    global current_df, current_filename
     file = request.files.get('file')
-    target_filename = request.form.get('filename')
-    import_time = 0
+    session_id = request.form.get('session_id') or str(uuid.uuid4())
     
-    if file:
-        start_time = time.time()
-        file_ext = os.path.splitext(file.filename)[1].lower()
-        if file_ext not in ['.csv', '.parquet', '.xlsx']:
-            return jsonify({"error": "Formato de arquivo não suportado. Use .csv, .parquet ou .xlsx"}), 400
-            
-        base_name = os.path.splitext(file.filename)[0]
-        parquet_path = os.path.join(UPLOAD_FOLDER, f"{base_name}.parquet")
-        
-        if file_ext == '.parquet':
-            file.save(parquet_path)
-        elif not os.path.exists(parquet_path):
-            temp_file = os.path.join(UPLOAD_FOLDER, file.filename)
-            file.save(temp_file)
-            
-            if file_ext == '.csv':
-                reader = pd.read_csv(temp_file, chunksize=500000, low_memory=False)
-                writer = None
-                for chunk in reader:
-                    table = pa.Table.from_pandas(chunk)
-                    if writer is None: writer = pq.ParquetWriter(parquet_path, table.schema)
-                    writer.write_table(table)
-                if writer: writer.close()
-            elif file_ext == '.xlsx':
-                df_excel = pd.read_excel(temp_file)
-                table = pa.Table.from_pandas(df_excel)
-                pq.write_table(table, parquet_path)
-                
-            os.remove(temp_file)
-            
-        current_filename = f"{base_name}.parquet"
-        
-        path = os.path.join(UPLOAD_FOLDER, current_filename)
-        current_df = pd.read_parquet(path)
-        import_time = time.time() - start_time
+    if not file: return jsonify({"error": "Nenhum arquivo"}), 400
+    
+    start_time = time.time()
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    
+    if file_ext == '.csv':
+        df = pd.read_csv(file, low_memory=False)
+    elif file_ext == '.xlsx':
+        df = pd.read_excel(file)
+    elif file_ext == '.parquet':
+        df = pd.read_parquet(file)
     else:
-        current_filename = target_filename
-        start_read = time.time()
-        path = os.path.join(UPLOAD_FOLDER, current_filename)
-        current_df = pd.read_parquet(path)
-        import_time = time.time() - start_read
+        return jsonify({"error": "Formato não suportado"}), 400
 
-    if not current_filename: return jsonify({"error": "Nenhum arquivo"}), 400
+    for col in df.columns:
+        if df[col].nunique() < 100000:
+            df[col] = df[col].astype('category')
+
+    cache.set(session_id, df)
     
-    for col in current_df.columns:
-        if current_df[col].nunique() < 100000:
-            current_df[col] = current_df[col].astype('category')
-        
-    options = {col: current_df[col].dropna().unique().astype(str).tolist()[:50] for col in current_df.columns}
+    import_time = time.time() - start_time
+    options = {col: df[col].dropna().unique().astype(str).tolist()[:50] for col in df.columns}
+    
+    out = io.BytesIO()
+    df.to_parquet(out)
+    out.seek(0)
+
     return jsonify({
-        "columns": current_df.columns.tolist(), 
+        "columns": df.columns.tolist(), 
         "options": options, 
-        "filename": current_filename,
+        "session_id": session_id,
         "import_time": f"{import_time:.3f}s"
     })
 
 @app.route('/fetch', methods=['POST'])
 def fetch_data():
-    global current_df
     params = request.json
-    page = int(params.get('page', 1))
+    session_id = params.get('session_id')
     query = params.get('jql_query', "").strip()
     sort_col = params.get('sort_col')
     sort_dir = params.get('sort_dir', 'asc')
     
+    df = cache.get(session_id)
+    if df is None: return jsonify({"error": "Sessão expirada ou arquivo não carregado"}), 404
+    
     start_time = time.time()
-    df = apply_jql(current_df, query)
-    if sort_col and sort_col in df.columns:
-        df = df.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
+    df_filtered = apply_jql(df, query)
+    
+    if sort_col and sort_col in df_filtered.columns:
+        df_filtered = df_filtered.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
+        
     filter_time = time.time() - start_time
     
-    total_count = len(df)
+    total_count = len(df_filtered)
     page_size = 100
+    page = int(params.get('page', 1))
     start = (page - 1) * page_size
-    pdf = df.iloc[start:start + page_size].copy()
+    pdf = df_filtered.iloc[start:start + page_size].copy()
+    
     for col in pdf.columns:
         if pdf[col].dtype.name == 'category':
             if "" not in pdf[col].cat.categories: pdf[col] = pdf[col].cat.add_categories("")
             pdf[col] = pdf[col].fillna("")
         else: pdf[col] = pdf[col].fillna("")
-    
+        
     return jsonify({
         "data": pdf.to_dict(orient='records'), 
         "total_count": total_count,
@@ -243,27 +145,45 @@ def fetch_data():
 
 @app.route('/analyze_column', methods=['POST'])
 def analyze_column():
-    global current_df
     params = request.json
     col = params.get('column')
+    session_id = params.get('session_id')
     query = params.get('jql_query', "").strip()
-    df = apply_jql(current_df, query)
-    unique_count = int(df[col].nunique())
-    counts = df[col].value_counts().head(50).to_dict()
+    
+    df = cache.get(session_id)
+    if df is None: return jsonify({"error": "Sessão expirada"}), 404
+    
+    df_filtered = apply_jql(df, query)
+    unique_count = int(df_filtered[col].nunique())
+    counts = df_filtered[col].value_counts().head(50).to_dict()
     formatted_counts = [{"value": str(k), "count": int(v)} for k, v in counts.items()]
+    
     return jsonify({
         "column": col, 
         "stats": formatted_counts, 
-        "total_rows": len(df),
+        "total_rows": len(df_filtered),
         "unique_values": unique_count
     })
 
+@app.route('/delete_session', methods=['POST'])
+def delete_session():
+    params = request.json
+    session_id = params.get('session_id')
+    if session_id:
+        cache.delete(session_id)
+    return jsonify({"status": "ok"})
+
 @app.route('/export', methods=['POST'])
 def export():
-    global current_df
     params = request.json
+    session_id = params.get('session_id')
     query = params.get('jql_query', "").strip()
-    df_filtered = apply_jql(current_df, query)
+    
+    df = cache.get(session_id)
+    if df is None: return jsonify({"error": "Sessão expirada"}), 404
+    
+    df_filtered = apply_jql(df, query)
+    
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_filtered.to_excel(writer, index=False, sheet_name='Resultados')
@@ -271,4 +191,4 @@ def export():
     return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(host='0.0.0.0', port=5001)
