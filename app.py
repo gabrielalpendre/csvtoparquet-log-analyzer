@@ -24,12 +24,15 @@ def parse_jql_to_mask(df, query):
     
     def evaluate_simple_condition(col, op, val):
         if col not in df.columns: return pd.Series([True] * len(df))
+        
+        series_str = df[col].astype(str).replace(['None', 'nan', '<NA>'], '')
+        
         if op == "=":
-            return (df[col].astype(str) == val)
+            return (series_str == val)
         elif op == "~":
-            return (df[col].astype(str).str.contains(val, case=False, na=False))
+            return (series_str.str.contains(val, case=False, na=False))
         elif op == "!~":
-            return ~(df[col].astype(str).str.contains(val, case=False, na=False))
+            return ~(series_str.str.contains(val, case=False, na=False))
         else:
             return pd.Series([True] * len(df))
 
@@ -77,7 +80,11 @@ def upload():
     sheet_name = request.form.get('sheet_name')
     
     if file_ext == '.csv':
-        df = pd.read_csv(file, engine='pyarrow', dtype_backend='pyarrow')
+        try:
+            df = pd.read_csv(file, engine='pyarrow')
+        except Exception as e:
+            file.seek(0)
+            df = pd.read_csv(file, low_memory=False)
     elif file_ext == '.xlsx':
         xl = pd.ExcelFile(file)
         sheets = xl.sheet_names
@@ -92,9 +99,14 @@ def upload():
         return jsonify({"error": "Formato não suportado"}), 400
 
     for col in df.columns:
-        if df[col].dtype == 'object' or 'string' in str(df[col].dtype):
-            if df[col].nunique() < 50000:
-                df[col] = df[col].astype('category')
+        if df[col].dtype == 'object':
+            df[col] = df[col].replace(r'^\s*$', None, regex=True)
+
+        non_null_count = df[col].count()
+        if non_null_count > 0:
+            if df[col].dtype == 'object' or 'string' in str(df[col].dtype):
+                if df[col].nunique() < 50000:
+                    df[col] = df[col].astype('category')
 
     cache.set(session_id, df)
     
@@ -136,7 +148,10 @@ def fetch_data():
     df_filtered = apply_jql(df, query)
     
     if sort_col and sort_col in df_filtered.columns:
-        df_filtered = df_filtered.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
+        try:
+            df_filtered = df_filtered.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
+        except:
+            df_filtered = df_filtered.assign(sort_tmp=df_filtered[sort_col].astype(str)).sort_values(by='sort_tmp', ascending=(sort_dir == 'asc')).drop(columns=['sort_tmp'])
         
     filter_time = time.time() - start_time
     
@@ -147,10 +162,14 @@ def fetch_data():
     pdf = df_filtered.iloc[start:start + page_size].copy()
     
     for col in pdf.columns:
-        if pdf[col].dtype.name == 'category':
-            if "" not in pdf[col].cat.categories: pdf[col] = pdf[col].cat.add_categories("")
+        if hasattr(pdf[col], 'cat'):
+            if "" not in pdf[col].cat.categories:
+                pdf[col] = pdf[col].cat.add_categories("")
             pdf[col] = pdf[col].fillna("")
-        else: pdf[col] = pdf[col].fillna("")
+        else:
+            if pdf[col].dtype != object:
+                pdf[col] = pdf[col].astype(object)
+            pdf[col] = pdf[col].fillna("")
         
     return jsonify({
         "data": pdf.to_dict(orient='records'), 

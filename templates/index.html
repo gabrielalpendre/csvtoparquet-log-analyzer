@@ -665,7 +665,7 @@
         document.getElementById('importTimeDisplay').style.display = 'block';
         document.getElementById('importTimeDisplay').querySelector('.timing-value').innerText = res.import_time;
 
-        if (!isHistory) loadHistory();
+        loadHistory();
         renderHeader();
         fetchData();
       } catch (e) { alert("Upload fail: " + e.message); }
