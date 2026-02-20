@@ -1,11 +1,8 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 import os
 import re
 import io
-import json
 import time
 import uuid
 from datetime import datetime
@@ -77,34 +74,52 @@ def upload():
     start_time = time.time()
     file_ext = os.path.splitext(file.filename)[1].lower()
     
+    sheet_name = request.form.get('sheet_name')
+    
     if file_ext == '.csv':
-        df = pd.read_csv(file, low_memory=False)
+        df = pd.read_csv(file, engine='pyarrow', dtype_backend='pyarrow')
     elif file_ext == '.xlsx':
-        df = pd.read_excel(file)
+        xl = pd.ExcelFile(file)
+        sheets = xl.sheet_names
+        if len(sheets) > 1 and not sheet_name:
+            return jsonify({"multi_sheet": True, "sheets": sheets, "session_id": session_id})
+        
+        target_sheet = sheet_name if sheet_name in sheets else sheets[0]
+        df = pd.read_excel(xl, sheet_name=target_sheet)
     elif file_ext == '.parquet':
-        df = pd.read_parquet(file)
+        df = pd.read_parquet(file, engine='pyarrow')
     else:
         return jsonify({"error": "Formato não suportado"}), 400
 
     for col in df.columns:
-        if df[col].nunique() < 100000:
-            df[col] = df[col].astype('category')
+        if df[col].dtype == 'object' or 'string' in str(df[col].dtype):
+            if df[col].nunique() < 50000:
+                df[col] = df[col].astype('category')
 
     cache.set(session_id, df)
     
     import_time = time.time() - start_time
     options = {col: df[col].dropna().unique().astype(str).tolist()[:50] for col in df.columns}
     
-    out = io.BytesIO()
-    df.to_parquet(out)
-    out.seek(0)
-
     return jsonify({
         "columns": df.columns.tolist(), 
         "options": options, 
         "session_id": session_id,
-        "import_time": f"{import_time:.3f}s"
+        "import_time": f"{import_time:.3f}s",
+        "is_parquet": file_ext == '.parquet'
     })
+
+@app.route('/get_parquet', methods=['POST'])
+def get_parquet():
+    params = request.json
+    session_id = params.get('session_id')
+    df = cache.get(session_id)
+    if df is None: return jsonify({"error": "Sessão expirada"}), 404
+    
+    out = io.BytesIO()
+    df.to_parquet(out, index=False, engine='pyarrow')
+    out.seek(0)
+    return send_file(out, mimetype='application/octet-stream', as_attachment=True, download_name='converted.parquet')
 
 @app.route('/fetch', methods=['POST'])
 def fetch_data():
@@ -154,6 +169,10 @@ def analyze_column():
     if df is None: return jsonify({"error": "Sessão expirada"}), 404
     
     df_filtered = apply_jql(df, query)
+    
+    if col not in df_filtered.columns:
+        return jsonify({"error": f"Coluna '{col}' não encontrada no arquivo atual"}), 400
+        
     unique_count = int(df_filtered[col].nunique())
     counts = df_filtered[col].value_counts().head(50).to_dict()
     formatted_counts = [{"value": str(k), "count": int(v)} for k, v in counts.items()]

@@ -53,7 +53,7 @@
 
     .app-grid {
       display: grid;
-      grid-template-columns: 280px 1fr 280px;
+      grid-template-columns: 320px 1fr 280px;
       height: 100vh;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -469,40 +469,126 @@
       req.onsuccess = () => {
         const files = req.result;
         let totalSize = 0;
-        document.getElementById('historyList').innerHTML = files.map(f => {
+
+        const groups = {};
+        files.forEach(f => {
           totalSize += (f.blob ? f.blob.size : 0);
-          return `
-        <div class="p-3 mb-1 history-item ${currentFilename === f.name ? 'active' : ''}" onclick="loadFromHistory('${f.name}')">
-          <div class="d-flex justify-content-between align-items-start">
-            <span class="text-truncate fw-bold text-warning" style="max-width:160px">${f.tag || f.name}</span>
-            <div class="history-actions">
-              <i class="bi bi-tag text-info" onclick="event.stopPropagation(); renameTag('${f.name}')"></i>
-              <i class="bi bi-trash text-danger" onclick="event.stopPropagation(); deleteFile('${f.name}')"></i>
-            </div>
-          </div>
-          <div style="font-size: 11px; color: #ffffff; margin-top:2px">${f.date} • ${(f.blob ? f.blob.size / (1024 * 1024) : 0).toFixed(2)} MB</div>
-        </div>
-      `;
-        }).join('');
+          const groupKey = f.originalFile || f.name;
+          if (!groups[groupKey]) groups[groupKey] = [];
+          groups[groupKey].push(f);
+        });
+
+        document.getElementById('historyList').innerHTML = Object.keys(groups)
+          .map(key => {
+            const group = groups[key];
+            const maxTimestamp = Math.max(...group.map(f => {
+              if (f.timestamp) return f.timestamp;
+              const parsed = new Date(f.date).getTime();
+              return isNaN(parsed) ? 0 : parsed;
+            }));
+            return { key, group, maxTimestamp };
+          })
+          .sort((a, b) => b.maxTimestamp - a.maxTimestamp)
+          .map(({ key, group }) => {
+            const master = group[0];
+            const isMulti = group.length > 1;
+            const isActive = group.some(f => currentFilename === f.name);
+
+            return `
+              <div class="p-3 mb-1 history-item ${isActive ? 'active' : ''}">
+                <div class="d-flex justify-content-between align-items-start" onclick="loadFromHistory('${master.name}')">
+                  <div class="d-flex flex-column" style="flex: 1; min-width: 0;">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="text-truncate fw-bold text-warning" title="${master.tag || key}">${master.tag || key}</span>
+                      ${isMulti ? `
+                        <select class="form-select form-select-sm bg-dark text-white border-secondary py-0" 
+                                style="font-size: 10px; height: 20px; width: auto; max-width: 120px;" 
+                                onclick="event.stopPropagation()"
+                                onchange="loadFromHistory(this.value)">
+                          <option value="" disabled selected>Selecione...</option>
+                          ${group.map(f => `<option value="${f.name}" ${currentFilename === f.name ? 'selected' : ''}>${f.sheetName || 'Aba'}</option>`).join('')}
+                        </select>
+                      ` : ''}
+                    </div>
+                    <small class="text-white opacity-50 text-truncate" style="font-size: 10px;">${key}</small>
+                  </div>
+                  <div class="history-actions ms-2">
+                    <i class="bi bi-tag text-info" title="Renomear" onclick="event.stopPropagation(); renameTag('${master.name}')"></i>
+                    <i class="bi bi-trash text-danger" title="Excluir" onclick="event.stopPropagation(); deleteFileGroup('${key}')"></i>
+                  </div>
+                </div>
+                <div style="font-size: 10px; color: #ffffff; margin-top:5px" class="opacity-75">${master.date} • ${(group.reduce((acc, f) => acc + (f.blob ? f.blob.size : 0), 0) / (1024 * 1024)).toFixed(2)} MB</div>
+              </div>
+            `;
+          }).join('');
         document.getElementById('totalSizeDisplay').innerText = `Total: ${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
       };
     }
 
+    async function deleteFileGroup(originalKey) {
+      if (!confirm(`Excluir todas as abas de ${originalKey}?`)) return;
+      const tx = db.transaction(storeName, "readonly");
+      const req = tx.objectStore(storeName).getAll();
+      req.onsuccess = async () => {
+        const toDelete = req.result.filter(f => (f.originalFile || f.name) === originalKey);
+        const deleteTx = db.transaction(storeName, "readwrite");
+        for (const f of toDelete) {
+          deleteTx.objectStore(storeName).delete(f.name);
+          fetch('/delete_session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: currentSessionId })
+          });
+          if (currentFilename === f.name) resetUI();
+        }
+        deleteTx.oncomplete = () => loadHistory();
+      };
+    }
+
+    function resetUI() {
+      currentFilename = "";
+      allColumns = [];
+      columnOptions = {};
+      currentPage = 1;
+      currentAnalyzedCol = null;
+      document.getElementById('activeFileDisplay').innerText = "UNSET";
+      document.getElementById('headerRow').innerHTML = "";
+      document.getElementById('tableBody').innerHTML = "";
+      document.getElementById('pageStats').innerText = "Exibindo 0-0 de 0";
+      document.getElementById('importTimeDisplay').style.display = 'none';
+      document.getElementById('filterTimeDisplay').style.display = 'none';
+      document.getElementById('appGrid').classList.add('analyzer-hidden');
+    }
+
     async function renameTag(name) {
       const file = await getFile(name);
-      const current = file.tag || name;
-      const newTag = prompt("Nome customizado (Tag):", current);
+      const groupKey = file.originalFile || file.name;
+      const current = file.tag || groupKey;
+      const newTag = prompt("Nome customizado (Tag) para este arquivo:", current);
+
       if (newTag !== null) {
-        const tx = db.transaction(storeName, "readwrite");
-        file.tag = newTag;
-        const req = tx.objectStore(storeName).put(file);
-        tx.oncomplete = () => {
-          loadHistory();
-          if (currentFilename === name) {
-            document.getElementById('activeFileDisplay').innerText = newTag || name;
-          }
+        const tx = db.transaction(storeName, "readonly");
+        const req = tx.objectStore(storeName).getAll();
+        req.onsuccess = () => {
+          const files = req.result.filter(f => (f.originalFile || f.name) === groupKey);
+          const writeTx = db.transaction(storeName, "readwrite");
+          files.forEach(f => {
+            f.tag = newTag;
+            writeTx.objectStore(storeName).put(f);
+          });
+          writeTx.oncomplete = () => {
+            loadHistory();
+            updateActiveDisplay();
+          };
         };
       }
+    }
+
+    async function updateActiveDisplay() {
+      const fileRecord = await getFile(currentFilename);
+      const tag = fileRecord?.tag || "";
+      const originalName = fileRecord?.originalFile || fileRecord?.name || currentFilename;
+      document.getElementById('activeFileDisplay').innerText = tag && tag !== originalName ? `${tag}` : originalName;
     }
 
     async function getFile(name) {
@@ -511,81 +597,86 @@
       });
     }
 
-    async function deleteFile(name) {
-      if (!confirm(`Delete ${name}?`)) return;
-
-      // Limpa Cache Servidor
-      fetch('/delete_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: currentSessionId })
-      });
-
-      const tx = db.transaction(storeName, "readwrite");
-      tx.objectStore(storeName).delete(name);
-
-      tx.oncomplete = () => {
-        if (currentFilename === name) {
-          // Limpa Estado
-          currentFilename = "";
-          allColumns = [];
-          columnOptions = {};
-          currentPage = 1;
-          currentAnalyzedCol = null;
-
-          // Limpa UI
-          document.getElementById('activeFileDisplay').innerText = "UNSET";
-          document.getElementById('headerRow').innerHTML = "";
-          document.getElementById('tableBody').innerHTML = "";
-          document.getElementById('pageStats').innerText = "Objects: 0";
-          document.getElementById('currentPageDisplay').innerText = "1";
-          document.getElementById('importTimeDisplay').style.display = 'none';
-          document.getElementById('filterTimeDisplay').style.display = 'none';
-          document.getElementById('appGrid').classList.add('analyzer-hidden');
-        }
-        loadHistory();
-      };
-    }
-
     async function loadFromHistory(name) {
       const file = await getFile(name);
       if (file) processUpload(file.blob, true, name);
     }
 
-    async function processUpload(file, isHistory = false, historyName = "") {
+    async function processUpload(file, isHistory = false, historyName = "", sheetName = "") {
       if (!file) return;
       setLoading(true);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', file, historyName || file.name);
       if (currentSessionId) formData.append('session_id', currentSessionId);
+      if (sheetName) formData.append('sheet_name', sheetName);
 
       try {
         const res = await fetch('/upload', { method: 'POST', body: formData }).then(r => r.json());
         if (res.error) throw new Error(res.error);
 
-        currentSessionId = res.session_id;
-        localStorage.setItem('last_session_id', currentSessionId);
-        currentFilename = historyName || file.name;
-        allColumns = res.columns;
-        columnOptions = res.options;
+        if (res.multi_sheet && !sheetName) {
+          if (res.session_id) currentSessionId = res.session_id;
 
-        if (!isHistory) {
-          const tx = db.transaction(storeName, "readwrite");
-          tx.objectStore(storeName).put({ name: file.name, blob: file, date: new Date().toLocaleString(), tag: "" });
+          for (const sName of res.sheets) {
+            await processUpload(file, false, "", sName);
+          }
+          return;
         }
 
-        document.getElementById('activeFileDisplay').innerText = (await getFile(currentFilename))?.tag || currentFilename;
+        currentSessionId = res.session_id;
+        localStorage.setItem('last_session_id', currentSessionId);
+
+        const sheetTitle = sheetName ? ` [${sheetName}]` : "";
+        currentFilename = historyName || (file.name + sheetTitle);
+
+        allColumns = res.columns || [];
+        columnOptions = res.options || {};
+
+        if (!isHistory) {
+          let blobToStore = file;
+          if (!res.is_parquet) {
+            const convRes = await fetch('/get_parquet', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session_id: currentSessionId })
+            });
+            if (convRes.ok) {
+              blobToStore = await convRes.blob();
+              if (!currentFilename.endsWith('.parquet')) {
+                currentFilename = currentFilename.split('.')[0] + sheetTitle + '.parquet';
+              }
+            }
+          }
+
+          const tx = db.transaction(storeName, "readwrite");
+          tx.objectStore(storeName).put({
+            name: currentFilename,
+            blob: blobToStore,
+            date: new Date().toLocaleString(),
+            timestamp: Date.now(),
+            tag: file.name + sheetTitle,
+            originalFile: file.name,
+            sheetName: sheetName
+          });
+        }
+
+        await updateActiveDisplay();
+
         document.getElementById('importTimeDisplay').style.display = 'block';
         document.getElementById('importTimeDisplay').querySelector('.timing-value').innerText = res.import_time;
 
+        if (!isHistory) loadHistory();
         renderHeader();
-        loadHistory();
         fetchData();
       } catch (e) { alert("Upload fail: " + e.message); }
       finally { setLoading(false); }
     }
 
     function renderHeader() {
+      if (!allColumns || !Array.isArray(allColumns)) {
+        console.error("allColumns is not an array:", allColumns);
+        return;
+      }
       document.getElementById('headerRow').innerHTML = `<tr>${allColumns.map(col => `
     <th onclick="analyzeColumn('${col}')" class="${currentAnalyzedCol === col ? 'analyzing' : ''}">
       <span>${col}</span> <i class="bi bi-arrow-down-up float-end opacity-25" onclick="event.stopPropagation(); applySort('${col}')"></i>
@@ -622,12 +713,15 @@
       <tr>${allColumns.map(col => `<td>${row[col] || ''}</td>`).join('')}</tr>
     `).join('');
 
-        document.getElementById('pageStats').innerText = `Total: ${res.total_count.toLocaleString()}`;
+        const totalPages = Math.ceil(res.total_count / 100);
+        const start = (currentPage - 1) * 100 + 1;
+        const end = Math.min(currentPage * 100, res.total_count);
+
+        document.getElementById('pageStats').innerText = `Exibindo ${start}-${end} de ${res.total_count.toLocaleString()}`;
         document.getElementById('filterTimeDisplay').style.display = 'block';
         document.getElementById('filterTimeDisplay').querySelector('.timing-value').innerText = res.filter_time;
-        document.getElementById('currentPageDisplay').innerText = currentPage;
+        document.getElementById('currentPageDisplay').innerText = `${currentPage} / ${totalPages || 1}`;
 
-        // Sincroniza coluna da direita se houver uma ativa
         if (currentAnalyzedCol) analyzeColumn(currentAnalyzedCol, true);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
@@ -661,19 +755,16 @@
       if (q === "") {
         ipt.value = newCond;
       } else {
-        // Verifica se a coluna já existe em um grupo
         const pattern = new RegExp(`\\((${col}\\s*!?~?=[^)]+)\\)`, 'i');
         const match = q.match(pattern);
 
         if (match) {
-          // Se já está agrupado, insere o OR dentro do grupo existente
+
           ipt.value = q.replace(pattern, `($1 OR ${newCond})`);
         } else if (new RegExp(`\\b${col}\\s*!?~?=`, 'i').test(q)) {
-          // Se existe sem parênteses, cria o grupo
           const soloPattern = new RegExp(`(${col}\\s*!?~?=[^\\s]+(?:\\s*"[^"]*")?)`, 'i');
           ipt.value = q.replace(soloPattern, `($1 OR ${newCond})`);
         } else {
-          // Se é uma coluna nova, adiciona com AND
           ipt.value = `(${q}) AND ${newCond}`;
         }
       }

@@ -1,115 +1,80 @@
 # Log Analyzer Pro
 
-O **Log Analyzer Pro** é uma ferramenta de análise de dados ultra-rápida, privada e escalável, projetada para processar grandes volumes de logs e tabelas diretamente no seu navegador, com o poder do **Python (Flask)** e **Pandas** no backend.
+O Log Analyzer Pro é uma plataforma avançada de análise de dados projetada para oferecer performance extrema, privacidade total e uma experiência de usuário premium. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
 
+![interface](static/interface.png)
 
-![home](static/interface.png)
+## Arquitetura e Fluxo de Dados
 
-## Funcionalidades
+A aplicação utiliza uma abordagem híbrida para garantir velocidade e segurança:
 
-- **Conversão Automática:** Transforma CSVs e XLSXs pesados em arquivos Parquet otimizados.
-- **Upload ágil:** Realize upload de arquivos CSV, XLSX ou Parquet apenas arrastando o arquivo para a tela.
-- **UI Responsiva:** Interface Dark Mode com painéis laterais retráteis e feedback visual de carregamento.
-- **Query JQL (JSON Query Language):** Filtros avançados com suporte a operadores `=` (igual), `~` (contém),  `!~` (não contém), `AND` e `OR`.
-- **Análise Quantitativa:** Contagem de valores e frequências com um clique no cabeçalho.
-- **Visualização de Performance:** Contagem de tempo para a importação do arquivo e tempo da execução do filtro.
-- **Persistência:** Histórico de arquivos carregados com opção de taguear com nomes e excluir.
-- **Exportação:** Gere relatórios em Excel (.xlsx) baseados nos seus filtros atuais.
-=======
-Esta aplicação foi reconstruída para ser **Executada via containe (Cloud Ready)** e respeitar a **Privacidade do Usuário (Privacy by Design)**.
->>>>>>> bdf1c50 (feat: adicionando novas features ao README)
+1. **Ingestão:** Os arquivos são carregados via Drag & Drop ou seletor convencional.
+2. **Conversão:** Arquivos CSV e Excel são convertidos instantaneamente para o formato Parquet através do motor PyArrow no servidor.
+3. **Persistência Local:** O arquivo convertido é enviado de volta ao navegador e armazenado no IndexedDB. Isso garante que, após o primeiro upload, o acesso aos dados seja imediato e offline (do ponto de vista de dados).
+4. **Análise em Cache:** Para operações de filtragem complexas (JQL), o sistema utiliza um cache de sessão no servidor para manter os DataFrames em memória, garantindo respostas em milissegundos.
 
----
+## Funcionalidades Detalhadas
 
-## Diferenciais
+### Processamento de Arquivos
+- **Suporte Nativo a Parquet:** Utiliza o formato colunar para máxima eficiência de leitura e compressão.
+- **Motor Multi-Abas (Excel):** Identifica automaticamente múltiplas planilhas dentro de um único arquivo .xlsx.
+- **Otimização de Tipos de Dados:** Conversão automática de colunas de texto com baixa cardinalidade para o tipo Category do Pandas, reduzindo drasticamente o consumo de memória.
 
-- ** Privacidade Total (IndexedDB):** Seus arquivos são armazenados localmente no banco de dados do seu navegador. O servidor é "stateless" (sem estado), ou de seja, seus dados nunca ficam salvos permanentemente em disco remoto.
-- ** Performance de Elite:** Utiliza processamento em memória e formatos otimizados (**Parquet**) para filtrar milhões de linhas em milissegundos.
-- ** AWS Multi-User Ready:** Arquitetura pronta para rodar em clusters **AWS ECS (Fargate)**, suportando múltiplos usuários simultâneos sem conflito de dados graças ao isolamento por `session_id`.
-- ** Infraestrutura como Código:** Inclui configurações completas de **Terraform** e **Docker** para deploy profissional.
+### Interface de Usuário
+- **Design de Alta Fidelidade:** Interface em Dark Mode inspirada em ferramentas de monitoramento modernas, com painéis retráteis e micro-animações.
+- **Sidebar Expansível (320px):** Espaço otimizado para visualização de nomes longos de arquivos e metadados.
+- **Histórico Agrupado:** Arquivos com múltiplas abas são exibidos como uma única entrada no histórico, contendo um seletor interno para alternar entre as planilhas.
+- **Ordenação Cronológica:** O histórico é organizado pela data e hora exata da importação mais recente.
 
----
+### Análise e Filtragem
+- **JQL (JSON Query Language):** Linguagem de consulta customizada que permite filtros complexos com operadores de igualdade (=), inclusão (~) e exclusão (!~).
+- **Agrupamento Lógico Inteligente:** Suporte a parênteses e operadores AND/OR. O sistema agrupa filtros automaticamente ao interagir com a interface para evitar seleções conflitantes.
+- **Distribuição de Frequência:** Clique em qualquer cabeçalho de coluna para visualizar os 50 valores mais frequentes, com barras de progresso proporcionais e contagem de valores únicos.
+- **Filtro Rápido:** Capacidade de aplicar filtros JQL instantaneamente ao clicar em itens da distribuição estatística.
 
-## Funcionalidades Avançadas
-
-- ** Smart JQL (Jira-like Query Language):**
-  - Operadores: `=` (Igual), `~` (Contém), `!~` (Não Contém).
-  - Lógica complexa: Suporte a `AND`, `OR` e agrupaento recursivo por `( )`.
-  - **Auto-Grouping:** Ao clicar em valores da mesma coluna, o JQL agrupa automaticamente com `OR` dentro dos parênteses.
-- ** Análise de Distribuição:** Painel lateral interativo que mostra a frequência de valores em tempo real, permitindo filtros rápidos com um clique.
-- ** Custom Tagging:** Renomeie seus arquivos no histórico local para facilitar a organização.
-- ** Drag & Drop:** Interface fluida com overlay de importação e suporte a arquivos `.csv`, `.parquet` e `.xlsx`.
-- ** Exportação Inteligente:** Gere arquivos Excel (.xlsx) filtrados com nomes customizados baseados em suas tags.
+### Exportação e Relatórios
+- **Exportação XLSX:** Gera arquivos Excel baseados no estado atual dos filtros aplicados, preservando a higienização dos dados.
+- **Nomenclatura Dinâmica:** Os nomes dos arquivos exportados respeitam as tags customizadas definidas pelo usuário.
 
 ---
 
-## Tecnologias
+## Diferenciais de Segurança e Performance
 
-- **Backend:** Python 3.11, Flask, Pandas, Cachelib.
-- **Frontend:** HTML5, Vanilla JS (ES6+), Bootstrap 5, IndexedDB.
-- **DevOps:** Docker, Docker Compose, Terraform, AWS ECS, ECR.
-
----
-
-## Como Rodar Localmente
-
-### 1. Via Python Puro
-```bash
-# Instale as dependências
-pip install -r requirements.txt
-
-# Inicie o servidor
-python app.py
-```
-Acesse em: `http://127.0.0.1:5001`
-
-### 2. Via Docker Compose
-```bash
-docker-compose up --build
-```
+- **Privacidade por Design:** O servidor é stateless. Nenhum dado do usuário é persistido em disco no ambiente de nuvem; as informações residem apenas no cache de memória volátil e no banco de dados local (IndexedDB) do próprio usuário.
+- **Escalabilidade Cloud-Ready:** Preparado para deploy horizontal através de containers Docker e infraestrutura como código (Terraform) na AWS.
+- **Monitoramento de Resource:** Exibição clara do tempo de importação e processamento de consultas para garantir transparência sobre a performance.
 
 ---
 
-## Deploy na AWS (Pipeline em 1 clique)
+## Estrutura de Infraestrutura
 
-Para subir em um ambiente de produção escalável no **AWS ECS Fargate**:
-
-1. Garanta que você tem o **AWS CLI** e **Terraform** instalados.
-2. Execute o script de pipeline:
-```bash
-chmod +x pipeline.sh
-./pipeline.sh
-```
-O script fará o build da imagem, push para o **Amazon ECR**, aplicará o **Terraform** e atualizará o serviço no **ECS**.
-
-**Realize um teste com um arquivo de exemplo**
-   [https://www.datablist.com/learn/csv/download-sample-csv-files](https://www.datablist.com/learn/csv/download-sample-csv-files)
+- **Docker:** Arquivos Dockerfile e docker-compose.yml inclusos para isolamento total de dependências.
+- **Terraform:** Módulos para criação de VPC, ECS Cluster (Fargate), ECR e Load Balancers na AWS, permitindo um pipeline de deploy profissional em poucos minutos.
 
 ---
 
-## Sintaxe JQL
+## Como Executar
 
-| Operador | Descrição | Exemplo |
+### Localmente com Python
+1. Instale as dependências: `pip install -r requirements.txt`
+2. Execute a aplicação: `python app.py`
+3. Acesse: http://127.0.0.1:5001
+
+### Localmente com Docker
+1. Execute: `docker-compose up --build`
+
+---
+
+## Sintaxe de Consulta (JQL)
+
+| Operador | Ação | Exemplo de Uso |
 | :--- | :--- | :--- |
-<<<<<<< HEAD
-| `=` | Correspondência exata | `Status = "Concluído"` |
-| `~` | Contém o termo | `Nome ~ "Gabriel"` |
-| `!~` | Não contém o termo | `Nome !~ "John"` |
-| `AND` | Soma condições | `Setor = "TI" AND Salario ~ "5000"` |
-| `OR` | Várias condições | `Idate = "26" OR Idade = "25"` |
-| `( )` | Agrupamento | `Setor = "TI" AND (Idate = "26" OR Idade = "25")` |
-=======
-| `=` | Correspondência Exata | `status = "ERROR"` |
-| `~` | Busca Parcial (Contém) | `mensagem ~ "timeout"` |
-| `!~` | Exclusão (Não Contém) | `url !~ "/health"` |
-| `AND` | Cruzamento de Dados | `status = "ERROR" AND user ~ "gabriel"` |
-| `OR` | Alternativa de Dados | `(status = "ERROR" OR status = "CRITICAL")` |
->>>>>>> bdf1c50 (feat: adicionando novas features ao README)
+| = | Igualdade exata | status = "sucesso" |
+| ~ | Busca parcial (Contém) | log_message ~ "timeout" |
+| !~ | Exclusão parcial (Não contém) | level !~ "debug" |
+| AND | Condição aditiva | status = "erro" AND user = "admin" |
+| OR | Condição alternativa | code = 500 OR code = 503 |
+| ( ) | Prioridade de lógica | status = "erro" AND (user = "a" OR user = "b") |
 
 ---
-
-## Monitoramento de Recursos
-A aplicação monitora o **Total Size** do seu banco de dados local (**IndexedDB**) na sidebar. Ao excluir um arquivo, o espaço é liberado instantaneamente tanto no seu navegador quanto no cache temporário do servidor.
-
----
-*Desenvolvido para praticidade e privacidade.*
+*Este projeto foi desenvolvido com foco em praticidade, velocidade absoluta e segurança de dados.*
