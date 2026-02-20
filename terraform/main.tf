@@ -136,10 +136,10 @@ resource "aws_security_group" "ecs_sg" {
 # Application Load Balancer
 resource "aws_lb" "main" {
   name               = "${local.config.app_name}-alb"
-  internal           = true
+  internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = local.config.subnet_ids
+  subnets            = local.config.public_subnet_ids
 
   tags = {
     Name = "${local.config.app_name}-alb"
@@ -199,7 +199,7 @@ resource "aws_ecs_service" "main" {
   }
 
   network_configuration {
-    subnets          = local.config.subnet_ids
+    subnets          = local.config.private_subnet_ids
     security_groups  = [aws_security_group.ecs_sg.id]
     assign_public_ip = false
   }
