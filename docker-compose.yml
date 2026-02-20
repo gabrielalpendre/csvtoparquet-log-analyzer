@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  log-analyzer:
+    build: .
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./flask_cache:/app/flask_cache
+    environment:
+      - FLASK_ENV=production
+    restart: always
