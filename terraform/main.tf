@@ -5,7 +5,7 @@ variable "env" {
 
 locals {
   config   = yamldecode(file("${path.module}/envs/${var.env}/config.yaml"))
-  app_name = "${local.config.app_name}-${var.env}"
+  app_name = "${var.env}-${local.config.app_name}"
 }
 
 provider "aws" {

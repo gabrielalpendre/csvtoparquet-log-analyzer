@@ -30,7 +30,7 @@ get_config() {
 
 AWS_REGION=$(get_config "aws_region")
 APP_NAME=$(get_config "app_name")
-APP_NAME="${APP_NAME}-${ENV}"
+APP_NAME="${ENV}-${APP_NAME}"
 IMAGE_TAG="latest"
 if command -v git &> /dev/null; then
     IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || IMAGE_TAG)
