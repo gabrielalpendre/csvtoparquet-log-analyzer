@@ -1,5 +1,11 @@
+variable "env" {
+  description = "Environment name (dev, hml, prd)"
+  type        = string
+}
+
 locals {
-  config = yamldecode(file("${path.module}/config.yaml"))
+  config   = yamldecode(file("${path.module}/envs/${var.env}/config.yaml"))
+  app_name = "${local.config.app_name}-${var.env}"
 }
 
 provider "aws" {
@@ -8,17 +14,17 @@ provider "aws" {
 
 module "iam" {
   source   = "./modules/iam"
-  app_name = local.config.app_name
+  app_name = local.app_name
 }
 
 module "ecr" {
   source   = "./modules/ecr"
-  app_name = local.config.app_name
+  app_name = local.app_name
 }
 
 module "network" {
   source            = "./modules/network"
-  app_name          = local.config.app_name
+  app_name          = local.app_name
   vpc_id            = local.config.vpc_id
   public_subnet_ids = local.config.public_subnet_ids
   alb_port          = local.config.alb_port
@@ -29,7 +35,7 @@ module "network" {
 
 module "ecs" {
   source             = "./modules/ecs"
-  app_name           = local.config.app_name
+  app_name           = local.app_name
   aws_region         = local.config.aws_region
   vpc_id             = local.config.vpc_id
   private_subnet_ids = local.config.private_subnet_ids
@@ -40,7 +46,7 @@ module "ecs" {
   target_group_arn   = module.network.target_group_arn
   alb_listener_arn   = module.network.alb_listener_arn
   environment_variables = [
-    for k, v in lookup(local.config, "environment_variables", {}) : {
+    for k, v in try(local.config.environment_variables, {}) != null ? local.config.environment_variables : {} : {
       name  = k
       value = tostring(v)
     }

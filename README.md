@@ -1,6 +1,6 @@
 # Log Analyzer
 
-O Log Analyzer é uma plataforma avançada de análise de dados projetada para oferecer performance extrema, privacidade total e uma experiência de usuário premium. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
+O Log Analyzer é uma plataforma avançada de análise de dados via navegador web. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
 
 ![interface](print/interface.png)
 

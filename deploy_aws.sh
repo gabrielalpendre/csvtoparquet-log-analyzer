@@ -13,9 +13,14 @@ echo "# Validando requisitos..."
 check_command "aws"
 check_command "docker"
 
-CONFIG_FILE="terraform/config.yaml"
+ENV=${1:-dev}
+CONFIG_FILE="terraform/envs/${ENV}/config.yaml"
+
+echo "# Ambiente selecionado: $ENV"
+
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Erro: Arquivo $CONFIG_FILE nao encontrado."
+    echo "Erro: Arquivo de configuracao para o ambiente '$ENV' nao encontrado em $CONFIG_FILE"
+    echo "Ambientes disponiveis: $(ls terraform/envs | sed 's/.yaml//g')"
     exit 1
 fi
 
@@ -25,6 +30,7 @@ get_config() {
 
 AWS_REGION=$(get_config "aws_region")
 APP_NAME=$(get_config "app_name")
+APP_NAME="${APP_NAME}-${ENV}"
 IMAGE_TAG="latest"
 if command -v git &> /dev/null; then
     IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || IMAGE_TAG)
