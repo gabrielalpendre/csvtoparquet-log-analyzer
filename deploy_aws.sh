@@ -25,12 +25,6 @@ get_config() {
 
 AWS_REGION=$(get_config "aws_region")
 APP_NAME=$(get_config "app_name")
-
-if [ -z "$APP_NAME" ]; then
-    echo "Erro: app_name nao encontrado no YAML."
-    exit 1
-fi
-
 IMAGE_TAG="latest"
 if command -v git &> /dev/null; then
     IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || IMAGE_TAG)

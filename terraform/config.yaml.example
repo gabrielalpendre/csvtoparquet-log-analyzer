@@ -8,8 +8,12 @@ private_subnet_ids:
   - "subnet-zzzzz"
 allow_cidr_lb:
   - "179.249.249.249/16"
-alb_port: 80
+alb_port: 443
+certificate_arn: "arn:aws:acm:region:account:certificate/uuid"
 allow_cidr_ecs:
   - "10.100.0.0/16"
 container_port: 8080
 app_name: "svc-name"
+environment_variables:
+  FLASK_ENV: "production"
+  CUSTOM_VAR: "custom_value"

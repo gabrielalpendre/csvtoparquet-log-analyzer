@@ -1,6 +1,6 @@
-# Log Analyzer Pro
+# Log Analyzer
 
-O Log Analyzer Pro é uma plataforma avançada de análise de dados projetada para oferecer performance extrema, privacidade total e uma experiência de usuário premium. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
+O Log Analyzer é uma plataforma avançada de análise de dados projetada para oferecer performance extrema, privacidade total e uma experiência de usuário premium. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
 
 ![interface](print/interface.png)
 
@@ -50,6 +50,18 @@ A aplicação utiliza uma abordagem híbrida para garantir velocidade e seguran�
 
 - **Docker:** Arquivos Dockerfile e docker-compose.yml inclusos para isolamento total de dependências.
 - **Terraform:** Módulos para criação de VPC, ECS Cluster (Fargate), ECR e Load Balancers na AWS, permitindo um pipeline de deploy profissional em poucos minutos.
+
+### Exemplo de Configuração do Backend (S3)
+Para manter o estado do Terraform remotamente, você pode configurar um backend S3:
+```hcl
+terraform {
+  backend "s3" {
+    bucket = "tf-accid"
+    key    = "path/ecs/svcname/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+```
 
 ---
 
