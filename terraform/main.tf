@@ -1,17 +1,3 @@
-variable "env" {
-  description = "Environment name (dev, hml, prd)"
-  type        = string
-}
-
-locals {
-  config   = yamldecode(file("${path.module}/envs/${var.env}/config.yaml"))
-  app_name = "${var.env}-${local.config.app_name}"
-}
-
-provider "aws" {
-  region = local.config.aws_region
-}
-
 module "iam" {
   source   = "./modules/iam"
   app_name = local.app_name
@@ -43,8 +29,13 @@ module "ecs" {
   allow_cidr_ecs     = local.config.allow_cidr_ecs
   execution_role_arn = module.iam.ecs_task_execution_role_arn
   repository_url     = module.ecr.repository_url
-  target_group_arn   = module.network.target_group_arn
-  alb_listener_arn   = module.network.alb_listener_arn
+  main_target_group_arn   = module.network.target_group_main_arn
+  canary_target_group_arn = module.network.target_group_canary_arn
+  alb_listener_arn       = module.network.alb_listener_arn
+  production_listener_rule_arn = module.network.production_listener_rule_arn
+  ecs_service_role_arn    = module.iam.ecs_service_role_arn
+  cpu                = try(local.config.ecs_cpu, "512")
+  memory             = try(local.config.ecs_memory, "1024")
   environment_variables = [
     for k, v in try(local.config.environment_variables, {}) != null ? local.config.environment_variables : {} : {
       name  = k

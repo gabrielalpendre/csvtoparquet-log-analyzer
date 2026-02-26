@@ -13,7 +13,17 @@ echo "# Validando requisitos..."
 check_command "aws"
 check_command "docker"
 
-ENV=${1:-dev}
+AUTO_APPROVE=false
+ENV="dev"
+
+for arg in "$@"; do
+    if [ "$arg" == "-auto-approve" ]; then
+        AUTO_APPROVE=true
+    elif [[ "$arg" == -env=* ]]; then
+        ENV="${arg#*-env=}"
+    fi
+done
+
 CONFIG_FILE="terraform/envs/${ENV}/config.yaml"
 
 echo "# Ambiente selecionado: $ENV"
@@ -24,6 +34,24 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
+AWS_IDENTITY=$(aws sts get-caller-identity --output json 2>/dev/null)
+if [ $? -ne 0 ]; then
+    echo "Erro: Verifique suas credenciais AWS (aws sso login ou aws configure)."
+    exit 1
+fi
+
+AWS_ACCOUNT_ID=$(echo "$AWS_IDENTITY" | python3 -c "import sys, json; print(json.load(sys.stdin)['Account'])")
+if [ "$AUTO_APPROVE" = false ]; then
+    echo "----------------------------------------------------"
+    echo "  CONTA AWS:  $AWS_ACCOUNT_ID"
+    echo "----------------------------------------------------"
+    read -p "Prosseguir? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
 get_config() {
     grep "^$1:" "$CONFIG_FILE" | awk -F': ' '{print $2}' | tr -d '"' | tr -d "'" | xargs
 }
@@ -31,12 +59,14 @@ get_config() {
 AWS_REGION=$(get_config "aws_region")
 APP_NAME=$(get_config "app_name")
 APP_NAME="${ENV}-${APP_NAME}"
+ECS_CPU=$(get_config "ecs_cpu")
+ECS_MEMORY=$(get_config "ecs_memory")
 IMAGE_TAG="latest"
+
 if command -v git &> /dev/null; then
     IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || IMAGE_TAG)
 fi
 
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text | xargs)
 REGISTRY_URL="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 ECR_REPO_NAME=$APP_NAME
 CLUSTER_NAME="$APP_NAME-cluster"
@@ -62,7 +92,7 @@ echo "# --- ETAPA 2: ATUALIZANDO TASK DEFINITION ---"
 echo "# Obtendo definicao atual da Task ($APP_NAME-task)..."
 TASK_DEF_JSON=$(aws ecs describe-task-definition --task-definition "$APP_NAME-task" --region $AWS_REGION)
 
-echo "# Gerando nova revisao com imagem: $IMAGE_TAG..."
+echo "# Gerando nova revisao com imagem: $IMAGE_TAG (CPU: $ECS_CPU, Memory: $ECS_MEMORY)..."
 NEW_TASK_DEF=$(echo "$TASK_DEF_JSON" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
@@ -77,8 +107,8 @@ output = {
     'networkMode': data['taskDefinition'].get('networkMode'),
     'placementConstraints': data['taskDefinition'].get('placementConstraints', []),
     'requiresCompatibilities': data['taskDefinition'].get('requiresCompatibilities', []),
-    'cpu': data['taskDefinition'].get('cpu'),
-    'memory': data['taskDefinition'].get('memory'),
+    'cpu': '$ECS_CPU' if '$ECS_CPU' else data['taskDefinition'].get('cpu'),
+    'memory': '$ECS_MEMORY' if '$ECS_MEMORY' else data['taskDefinition'].get('memory'),
     'taskRoleArn': data['taskDefinition'].get('taskRoleArn'),
     'executionRoleArn': data['taskDefinition'].get('executionRoleArn'),
     'runtimePlatform': data['taskDefinition'].get('runtimePlatform')

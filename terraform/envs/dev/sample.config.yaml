@@ -10,6 +10,8 @@ allow_cidr_lb:
   - "179.249.249.249/16"
 alb_port: 443
 certificate_arn: "arn:aws:acm:region:account:certificate/uuid"
+ecs_cpu: "512"
+ecs_memory: "1024"
 allow_cidr_ecs:
   - "10.100.0.0/16"
 container_port: 8080

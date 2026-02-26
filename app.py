@@ -5,13 +5,47 @@ import re
 import io
 import time
 import uuid
+import hashlib
 from datetime import datetime
-from cachelib import FileSystemCache
 
 app = Flask(__name__)
-app.secret_key = str(uuid.uuid4())
+app.secret_key = os.environ.get("SECRET_KEY", str(uuid.uuid4()))
 
-cache = FileSystemCache('flask_cache', threshold=100, default_timeout=3600)
+sessions = {}
+SESSION_TTL = 8 * 3600  # 8 Hours
+
+def get_user_id():
+    """Generates a simple hash based on user IP and User-Agent for session binding."""
+    ip = request.remote_addr or "unknown"
+    ua = request.headers.get('User-Agent', 'unknown')
+    return hashlib.sha256(f"{ip}_{ua}".encode()).hexdigest()
+
+def clean_expired_sessions():
+    now = time.time()
+    to_delete = [sid for sid, data in sessions.items() if now - data['created'] > SESSION_TTL]
+    for sid in to_delete:
+        print(f"[*] SESSÃO EXPIRADA (Limite 8h): {sid[:8]}...")
+        del sessions[sid]
+
+def get_session_data(session_id):
+    clean_expired_sessions()
+    data = sessions.get(session_id)
+    if not data:
+        return None
+    
+    if data['user_id'] != get_user_id():
+        return None
+        
+    return data['df']
+
+def set_session_data(session_id, df):
+    if session_id not in sessions:
+        print(f"[+] NOVA SESSÃO INICIADA: {session_id[:8]}...")
+    sessions[session_id] = {
+        "df": df,
+        "user_id": get_user_id(),
+        "created": time.time()
+    }
 
 def parse_jql_to_mask(df, query):
     query = query.strip()
@@ -19,22 +53,15 @@ def parse_jql_to_mask(df, query):
         match = re.search(r'\(([^()]+)\)', query)
         if not match: break
         inner_query = match.group(1)
-        mask = parse_jql_to_mask(df, inner_query)
         break
     
     def evaluate_simple_condition(col, op, val):
         if col not in df.columns: return pd.Series([True] * len(df))
-        
         series_str = df[col].astype(str).replace(['None', 'nan', '<NA>'], '')
-        
-        if op == "=":
-            return (series_str == val)
-        elif op == "~":
-            return (series_str.str.contains(val, case=False, na=False))
-        elif op == "!~":
-            return ~(series_str.str.contains(val, case=False, na=False))
-        else:
-            return pd.Series([True] * len(df))
+        if op == "=": return (series_str == val)
+        elif op == "~": return (series_str.str.contains(val, case=False, na=False))
+        elif op == "!~": return ~(series_str.str.contains(val, case=False, na=False))
+        return pd.Series([True] * len(df))
 
     tokens = re.findall(r'(\w+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
     if not tokens: return pd.Series([True] * len(df))
@@ -71,18 +98,16 @@ def index():
 def upload():
     file = request.files.get('file')
     session_id = request.form.get('session_id') or str(uuid.uuid4())
-    
     if not file: return jsonify({"error": "Nenhum arquivo"}), 400
     
     start_time = time.time()
     file_ext = os.path.splitext(file.filename)[1].lower()
-    
     sheet_name = request.form.get('sheet_name')
     
     if file_ext == '.csv':
         try:
             df = pd.read_csv(file, engine='pyarrow')
-        except Exception as e:
+        except:
             file.seek(0)
             df = pd.read_csv(file, low_memory=False)
     elif file_ext == '.xlsx':
@@ -90,7 +115,6 @@ def upload():
         sheets = xl.sheet_names
         if len(sheets) > 1 and not sheet_name:
             return jsonify({"multi_sheet": True, "sheets": sheets, "session_id": session_id})
-        
         target_sheet = sheet_name if sheet_name in sheets else sheets[0]
         df = pd.read_excel(xl, sheet_name=target_sheet)
     elif file_ext == '.parquet':
@@ -100,33 +124,43 @@ def upload():
 
     for col in df.columns:
         if df[col].dtype == 'object':
-            df[col] = df[col].replace(r'^\s*$', None, regex=True)
+            df[col] = df[col].astype(str).str.strip().replace('', None)
+            
+            cardinality = df[col].nunique()
+            if cardinality < (len(df) * 0.1) and cardinality < 5000:
+                df[col] = df[col].astype('category')
 
-        non_null_count = df[col].count()
-        if non_null_count > 0:
-            if df[col].dtype == 'object' or 'string' in str(df[col].dtype):
-                if df[col].nunique() < 50000:
-                    df[col] = df[col].astype('category')
-
-    cache.set(session_id, df)
-    
+    set_session_data(session_id, df)
     import_time = time.time() - start_time
+    
     options = {col: df[col].dropna().unique().astype(str).tolist()[:50] for col in df.columns}
     
-    return jsonify({
-        "columns": df.columns.tolist(), 
-        "options": options, 
+    import json
+    metadata = {
+        "columns": df.columns.tolist(),
+        "options": options,
         "session_id": session_id,
         "import_time": f"{import_time:.3f}s",
-        "is_parquet": file_ext == '.parquet'
-    })
+        "is_parquet": True
+    }
+    
+    out = io.BytesIO()
+    df.to_parquet(out, index=False, engine='pyarrow', compression='snappy')
+    total_size = out.tell()
+    out.seek(0)
+    
+    print(f"[+] ARQUIVO PROCESSADO: {file.filename} | Tamanho Final: {total_size/(1024*1024):.2f}MB | Tempo Servidor: {import_time:.3f}s")
+    
+    response = send_file(out, mimetype='application/octet-stream')
+    response.headers['X-Log-Metadata'] = json.dumps(metadata)
+    return response
 
 @app.route('/get_parquet', methods=['POST'])
 def get_parquet():
     params = request.json
     session_id = params.get('session_id')
-    df = cache.get(session_id)
-    if df is None: return jsonify({"error": "Sessão expirada"}), 404
+    df = get_session_data(session_id)
+    if df is None: return jsonify({"error": "Sessão expirada ou acesso negado"}), 404
     
     out = io.BytesIO()
     df.to_parquet(out, index=False, engine='pyarrow')
@@ -141,20 +175,16 @@ def fetch_data():
     sort_col = params.get('sort_col')
     sort_dir = params.get('sort_dir', 'asc')
     
-    df = cache.get(session_id)
-    if df is None: return jsonify({"error": "Sessão expirada ou arquivo não carregado"}), 404
+    df = get_session_data(session_id)
+    if df is None: return jsonify({"error": "Sessão expirada"}), 404
     
     start_time = time.time()
     df_filtered = apply_jql(df, query)
     
     if sort_col and sort_col in df_filtered.columns:
-        try:
-            df_filtered = df_filtered.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
-        except:
-            df_filtered = df_filtered.assign(sort_tmp=df_filtered[sort_col].astype(str)).sort_values(by='sort_tmp', ascending=(sort_dir == 'asc')).drop(columns=['sort_tmp'])
+        df_filtered = df_filtered.sort_values(by=sort_col, ascending=(sort_dir == 'asc'))
         
     filter_time = time.time() - start_time
-    
     total_count = len(df_filtered)
     page_size = 100
     page = int(params.get('page', 1))
@@ -167,8 +197,6 @@ def fetch_data():
                 pdf[col] = pdf[col].cat.add_categories("")
             pdf[col] = pdf[col].fillna("")
         else:
-            if pdf[col].dtype != object:
-                pdf[col] = pdf[col].astype(object)
             pdf[col] = pdf[col].fillna("")
         
     return jsonify({
@@ -184,7 +212,7 @@ def analyze_column():
     session_id = params.get('session_id')
     query = params.get('jql_query', "").strip()
     
-    df = cache.get(session_id)
+    df = get_session_data(session_id)
     if df is None: return jsonify({"error": "Sessão expirada"}), 404
     
     df_filtered = apply_jql(df, query)
@@ -207,8 +235,9 @@ def analyze_column():
 def delete_session():
     params = request.json
     session_id = params.get('session_id')
-    if session_id:
-        cache.delete(session_id)
+    if session_id in sessions:
+        print(f"[-] SESSÃO FINALIZADA (Manual): {session_id[:8]}...")
+        sessions.pop(session_id, None)
     return jsonify({"status": "ok"})
 
 @app.route('/export', methods=['POST'])
@@ -216,12 +245,10 @@ def export():
     params = request.json
     session_id = params.get('session_id')
     query = params.get('jql_query', "").strip()
-    
-    df = cache.get(session_id)
+    df = get_session_data(session_id)
     if df is None: return jsonify({"error": "Sessão expirada"}), 404
     
     df_filtered = apply_jql(df, query)
-    
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_filtered.to_excel(writer, index=False, sheet_name='Resultados')
@@ -229,4 +256,5 @@ def export():
     return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+    is_debug = os.environ.get("FLASK_ENV") == "development"
+    app.run(host='0.0.0.0', port=5001, debug=is_debug)

@@ -1,79 +1,66 @@
 # Log Analyzer
 
-O Log Analyzer é uma plataforma avançada de análise de dados via navegador web. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
+O Log Analyzer é uma plataforma avançada de análise de dados. A ferramenta permite processar, filtrar e analisar grandes volumes de logs e tabelas (CSV, XLSX, Parquet) diretamente no navegador, utilizando um backend Python otimizado para operações em memória.
 
 ![interface](print/interface.png)
 
 ## Arquitetura e Fluxo de Dados
 
-A aplicação utiliza uma abordagem híbrida para garantir velocidade e segurança:
+A aplicação utiliza uma abordagem híbrida de alta performance e segurança:
 
 1. **Ingestão:** Os arquivos são carregados via Drag & Drop ou seletor convencional.
-2. **Conversão:** Arquivos CSV e Excel são convertidos instantaneamente para o formato Parquet através do motor PyArrow no servidor.
-3. **Persistência Local:** O arquivo convertido é enviado de volta ao navegador e armazenado no IndexedDB. Isso garante que, após o primeiro upload, o acesso aos dados seja imediato e offline (do ponto de vista de dados).
-4. **Análise em Cache:** Para operações de filtragem complexas (JQL), o sistema utiliza um cache de sessão no servidor para manter os DataFrames em memória, garantindo respostas em milissegundos.
+2. **Otimização (Optimizing File Cache):** 
+   - Arquivos CSV e Excel são convertidos instantaneamente para o formato **Parquet** via PyArrow.
+   - O sistema realiza a otimização de memória automática, convertendo colunas de baixa cardinalidade em categorias.
+3. **Persistência Local:** O arquivo convertido é armazenado no **IndexedDB** do navegador. Isso garante que, após o primeiro upload, o acesso aos dados seja imediato e offline (do ponto de vista de dados).
+4. **Análise Stateless em RAM:** Para filtragens JQL, o servidor mantém os DataFrames **apenas em memória (RAM)**. Não há persistência em disco no servidor, garantindo velocidade absoluta e privacidade.
 
 ## Funcionalidades Detalhadas
 
-### Processamento de Arquivos
-- **Suporte Nativo a Parquet:** Utiliza o formato colunar para máxima eficiência de leitura e compressão.
-- **Motor Multi-Abas (Excel):** Identifica automaticamente múltiplas planilhas dentro de um único arquivo .xlsx.
-- **Otimização de Tipos de Dados:** Conversão automática de colunas de texto com baixa cardinalidade para o tipo Category do Pandas, reduzindo drasticamente o consumo de memória.
+### Processamento e Performance
+- **Motor PyArrow:** Processamento ultrarrápido de arquivos colunares.
+- **Memória Eficiente:** Otimização automática de colunas `object` para `category`, reduzindo o consumo de RAM em até 80%.
+- **Excel Multitab:** Processamento coeso de arquivos com múltiplas abas em um único fluxo de importação.
+- **Progress Tracking:** Barra de progresso em tempo real que reflete cada micro-etapa (Upload, Otimização e Interface).
 
-### Interface de Usuário
-- **Design de Alta Fidelidade:** Interface em Dark Mode inspirada em ferramentas de monitoramento modernas, com painéis retráteis e micro-animações.
-- **Sidebar Expansível (320px):** Espaço otimizado para visualização de nomes longos de arquivos e metadados.
-- **Histórico Agrupado:** Arquivos com múltiplas abas são exibidos como uma única entrada no histórico, contendo um seletor interno para alternar entre as planilhas.
-- **Ordenação Cronológica:** O histórico é organizado pela data e hora exata da importação mais recente.
+### Interface e Experiência
+- **Design Premium:** Interface Dark Mode com fidelidade visual, micro-animações e painéis retráteis.
+- **Histórico Inteligente:** Sidebar com agrupamento de arquivos, suporte a renomeação (Tags) e exclusão em lote.
+- **Timing Breakdown:** Ao passar o mouse sobre o tempo de processamento no histórico, um tooltip detalhado exibe o tempo exato gasto em cada etapa técnica.
+- **Navegação Silenciosa:** Troca de páginas e filtros rápidos sem bloqueio de interface (Silent Fetching).
 
-### Análise e Filtragem
-- **JQL (JSON Query Language):** Linguagem de consulta customizada que permite filtros complexos com operadores de igualdade (=), inclusão (~) e exclusão (!~).
-- **Agrupamento Lógico Inteligente:** Suporte a parênteses e operadores AND/OR. O sistema agrupa filtros automaticamente ao interagir com a interface para evitar seleções conflitantes.
-- **Distribuição de Frequência:** Clique em qualquer cabeçalho de coluna para visualizar os 50 valores mais frequentes, com barras de progresso proporcionais e contagem de valores únicos.
-- **Filtro Rápido:** Capacidade de aplicar filtros JQL instantaneamente ao clicar em itens da distribuição estatística.
-
-### Exportação e Relatórios
-- **Exportação XLSX:** Gera arquivos Excel baseados no estado atual dos filtros aplicados, preservando a higienização dos dados.
-- **Nomenclatura Dinâmica:** Os nomes dos arquivos exportados respeitam as tags customizadas definidas pelo usuário.
-
----
-
-## Diferenciais de Segurança e Performance
-
-- **Privacidade por Design:** O servidor é stateless. Nenhum dado do usuário é persistido em disco no ambiente de nuvem; as informações residem apenas no cache de memória volátil e no banco de dados local (IndexedDB) do próprio usuário.
-- **Escalabilidade Cloud-Ready:** Preparado para deploy horizontal através de containers Docker e infraestrutura como código (Terraform) na AWS.
-- **Monitoramento de Resource:** Exibição clara do tempo de importação e processamento de consultas para garantir transparência sobre a performance.
+### Segurança Avançada
+- **Sessões Efêmeras:** Limite estrito de **8 horas** por sessão.
+- **Proteção Anti-Hijacking:** Cada sessão é vinculada à identidade do usuário (IP + User-Agent). O acesso é negado se houver tentativa de roubo de sessão.
+- **Zero Disk Trace:** O servidor não grava caches em disco (nem em AWS, nem em Docker local), utilizando `/dev/shm` para arquivos temporários críticos.
 
 ---
 
 ## Estrutura de Infraestrutura
 
-- **Docker:** Arquivos Dockerfile e docker-compose.yml inclusos para isolamento total de dependências.
-- **Terraform:** Módulos para criação de VPC, ECS Cluster (Fargate), ECR e Load Balancers na AWS, permitindo um pipeline de deploy profissional em poucos minutos.
+- **Docker:** Configuração otimizada para desenvolvimento com volumes montados (`hot-reload`) e produção com Gunicorn.
+- **Terraform:** Infraestrutura AWS pronta para produção (VPC, ECS Fargate, ECR, Load Balancers).
+- **Backend Remoto:** Gestão de estado isolada por ambiente (dev/prod) via S3.
 
-### Exemplo de Configuração do Backend (S3)
-Para manter o estado do Terraform remotamente, você pode configurar um backend S3:
-```hcl
-terraform {
-  backend "s3" {
-    bucket = "tf-accid"
-    key    = "path/ecs/svcname/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
+### Configuração do Terraform
+
+Para inicializar com backend isolado:
+```bash
+terraform init -backend-config=envs/dev/backend.tf
 ```
 
 ---
 
 ## Como Executar
 
-### Localmente com Python
-1. Instale as dependências: `pip install -r requirements.txt`
-2. Execute a aplicação: `python app.py`
-3. Acesse: http://127.0.0.1:5001
+### Localmente (Desenvolvimento)
+1. Certifique-se de ter o Docker instalado.
+2. Execute: `docker-compose up --build`
+3. A aplicação estará disponível em: `http://localhost:5001`
+   - *Nota: O código local está montado como volume. Alterações no Python ou HTML serão refletidas instantaneamente (hot-reload).*
 
-### Localmente com Docker
-1. Execute: `docker-compose up --build`
+### Produção (AWS)
+A aplicação está preparada para rodar em clusters ECS operando em modo stateless total. Certifique-se de configurar a `SECRET_KEY` via variável de ambiente.
 
 ---
 
@@ -89,4 +76,4 @@ terraform {
 | ( ) | Prioridade de lógica | status = "erro" AND (user = "a" OR user = "b") |
 
 ---
-*Este projeto foi desenvolvido com foco em praticidade, velocidade absoluta e segurança de dados.*
+*Desenvolvido com foco em privacidade total, velocidade extrema e experiência de usuário premium.*

@@ -6,7 +6,14 @@ services:
     ports:
       - "5001:5001"
     volumes:
-      - ./flask_cache:/app/flask_cache
+      - .:/app
     environment:
-      - FLASK_ENV=production
+      - FLASK_ENV=development
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4096M
+        reservations:
+          memory: 2048M

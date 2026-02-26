@@ -32,8 +32,8 @@
       border: 2px solid var(--scrollbar-track);
     }
 
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--scrollbar-thumb-hover);
+    .progress-bar {
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     * {
@@ -322,6 +322,38 @@
       height: 100%;
       z-index: 1001;
     }
+
+    .history-timing-hover {
+      position: relative;
+      display: inline-block;
+      text-decoration: underline dotted var(--element-orange);
+    }
+
+    .history-timing-hover:hover::after {
+      content: attr(data-breakdown);
+      position: absolute;
+      right: 0;
+      top: 100%;
+      background: rgba(20, 30, 40, 0.99);
+      border: 1px solid var(--element-orange);
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-line;
+      z-index: 11000;
+      font-size: 11px;
+      color: #fff;
+      min-width: 240px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+      line-height: 1.6;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: left;
+    }
+
+    /* Ensure sidebar is always above main content when active */
+    .sidebar {
+      z-index: 1050 !important;
+    }
   </style>
   <title>Log Analyzer</title>
 </head>
@@ -366,9 +398,7 @@
             <input type="text" id="jqlInput" class="jql-input" placeholder="Query JQL (i)" autocomplete="off">
 
             <div class="d-flex gap-1" id="timingContainer">
-              <div id="importTimeDisplay" class="timing-badge" style="display: none;">IMP: <span
-                  class="timing-value">0s</span></div>
-              <div id="filterTimeDisplay" class="timing-badge" style="display: none;">FLT: <span
+              <div id="filterTimeDisplay" class="timing-badge" style="display: none;">FILTER TIME: <span
                   class="timing-value">0s</span></div>
             </div>
 
@@ -389,10 +419,20 @@
 
       <section class="table-area" id="tableContainer">
         <div id="mainLoader"
-          style="display:none; position: absolute; top:40%; left:50%; translate: -50% -50%; z-index: 2001;"
+          style="display:none; position: absolute; top:50%; left:50%; translate: -50% -50%; z-index: 2001; background: rgba(15, 23, 30, 0.95); padding: 25px; border-radius: 8px; border: 1px solid var(--element-border); min-width: 320px;"
           class="text-center text-warning">
-          <div class="spinner-border"></div>
-          <div class="mt-2 fw-bold">PROCESSING...</div>
+          <div class="spinner-border text-warning mb-3"></div>
+          <div class="h5 fw-bold mb-1" id="loaderText">PROCESSING...</div>
+          <div id="loaderTimer" class="h4 fw-light mb-3">0.0s</div>
+
+          <div class="progress mb-3" style="height: 8px; background: #2b3948;" id="loaderProgressContainer">
+            <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" role="progressbar"
+              id="loaderProgressBar" style="width: 0%"></div>
+          </div>
+
+          <div id="loaderStages" class="text-start border-top border-secondary pt-3 mt-2"
+            style="font-size: 11px; max-height: 150px; overflow-y: auto;">
+          </div>
         </div>
         <table class="table table-dark fixed-table mb-0">
           <thead id="headerRow"></thead>
@@ -517,7 +557,20 @@
                     <i class="bi bi-trash text-danger" title="Excluir" onclick="event.stopPropagation(); deleteFileGroup('${key}')"></i>
                   </div>
                 </div>
-                <div style="font-size: 10px; color: #ffffff; margin-top:5px" class="opacity-75">${master.date} • ${(group.reduce((acc, f) => acc + (f.blob ? f.blob.size : 0), 0) / (1024 * 1024)).toFixed(2)} MB</div>
+                <div class="d-flex justify-content-between align-items-center mt-2" style="font-size: 10px;">
+                  <span class="opacity-50">
+                    ${master.date} • 
+                    <span title="Original / Compresso">
+                      ${master.originalSize ? (master.originalSize / (1024 * 1024)).toFixed(2) : '?'} / 
+                      ${(group.reduce((acc, f) => acc + (f.blob ? f.blob.size : 0), 0) / (1024 * 1024)).toFixed(2)} MB
+                    </span>
+                  </span>
+                  ${master.serverTime ? `
+                    <span class="text-warning history-timing-hover fw-bold d-flex align-items-center gap-1" data-breakdown="${master.stagesBreakdown || 'Timing details not available'}" style="cursor:help;">
+                      ${master.serverTime}s <i class="bi bi-clock-history"></i>
+                    </span>
+                  ` : ''}
+                </div>
               </div>
             `;
           }).join('');
@@ -555,7 +608,6 @@
       document.getElementById('headerRow').innerHTML = "";
       document.getElementById('tableBody').innerHTML = "";
       document.getElementById('pageStats').innerText = "Exibindo 0-0 de 0";
-      document.getElementById('importTimeDisplay').style.display = 'none';
       document.getElementById('filterTimeDisplay').style.display = 'none';
       document.getElementById('appGrid').classList.add('analyzer-hidden');
     }
@@ -564,7 +616,7 @@
       const file = await getFile(name);
       const groupKey = file.originalFile || file.name;
       const current = file.tag || groupKey;
-      const newTag = prompt("Nome customizado (Tag) para este arquivo:", current);
+      const newTag = prompt("Custom Name (Tag)", current);
 
       if (newTag !== null) {
         const tx = db.transaction(storeName, "readonly");
@@ -602,75 +654,157 @@
       if (file) processUpload(file.blob, true, name);
     }
 
-    async function processUpload(file, isHistory = false, historyName = "", sheetName = "") {
-      if (!file) return;
-      setLoading(true);
-      const formData = new FormData();
-      formData.append('file', file, historyName || file.name);
-      if (currentSessionId) formData.append('session_id', currentSessionId);
-      if (sheetName) formData.append('sheet_name', sheetName);
+    function processUpload(file, isHistory = false, historyName = "", sheetName = "", keepLoader = false) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve();
+        if (!keepLoader) setLoading(true, "PROCESSANDO...");
 
-      try {
-        const res = await fetch('/upload', { method: 'POST', body: formData }).then(r => r.json());
-        if (res.error) throw new Error(res.error);
+        const totalStartTime = Date.now();
+        const originalSize = file.size;
+        const progressBar = document.getElementById('loaderProgressBar');
 
-        if (res.multi_sheet && !sheetName) {
-          if (res.session_id) currentSessionId = res.session_id;
+        const formData = new FormData();
+        formData.append('file', file, historyName || file.name);
+        if (currentSessionId) formData.append('session_id', currentSessionId);
+        if (sheetName) formData.append('sheet_name', sheetName);
 
-          for (const sName of res.sheets) {
-            await processUpload(file, false, "", sName);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+        xhr.responseType = 'arraybuffer';
+
+        const timestamp = Date.now() + Math.random();
+        const uploadStageId = (sheetName ? `UPLOAD_${sheetName.replace(/\s+/g, '_')}` : "UPLOAD") + "_" + timestamp;
+        const uploadLabel = sheetName ? `LENDO ABA: ${sheetName}` : "UPLOADING FILE";
+        const optimizingStageId = "OPTIMIZING_" + (sheetName || "") + "_" + timestamp;
+        const optimizingLabel = "OPTIMIZING FILE CACHE";
+
+        addStage(uploadStageId, uploadLabel);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = (e.loaded / e.total) * 100;
+            progressBar.style.width = (percent * 0.7) + '%';
+            updateStage(uploadStageId, `${uploadLabel} (${Math.round(percent)}%)`);
           }
-          return;
-        }
+        };
 
-        currentSessionId = res.session_id;
-        localStorage.setItem('last_session_id', currentSessionId);
+        xhr.upload.onload = () => {
+          finishStage(uploadStageId);
+          if (!stages[optimizingStageId]) {
+            addStage(optimizingStageId, optimizingLabel);
+            progressBar.style.width = '75%';
+          }
+        };
 
-        const sheetTitle = sheetName ? ` [${sheetName}]` : "";
-        currentFilename = historyName || (file.name + sheetTitle);
+        xhr.onload = async () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              if (stages[uploadStageId] && !stages[uploadStageId].end) finishStage(uploadStageId);
+              if (!stages[optimizingStageId]) addStage(optimizingStageId, optimizingLabel);
 
-        allColumns = res.columns || [];
-        columnOptions = res.options || {};
+              progressBar.style.width = '80%';
 
-        if (!isHistory) {
-          let blobToStore = file;
-          if (!res.is_parquet) {
-            const convRes = await fetch('/get_parquet', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ session_id: currentSessionId })
-            });
-            if (convRes.ok) {
-              blobToStore = await convRes.blob();
+              const metadataRaw = xhr.getResponseHeader('X-Log-Metadata');
+              let res;
+              if (metadataRaw) {
+                res = JSON.parse(metadataRaw);
+              } else {
+                const decoder = new TextDecoder('utf-8');
+                res = JSON.parse(decoder.decode(xhr.response));
+              }
+
+              if (res.error) throw new Error(res.error);
+
+              if (res.multi_sheet && !sheetName) {
+                if (res.session_id) currentSessionId = res.session_id;
+                for (const sName of res.sheets) {
+                  await processUpload(file, false, "", sName, true);
+                }
+                finishStage(optimizingStageId);
+                setTimeout(() => setLoading(false), 800);
+                return resolve();
+              }
+
+              currentSessionId = res.session_id;
+              localStorage.setItem('last_session_id', currentSessionId);
+
+              const sheetTitle = sheetName ? ` [${sheetName}]` : "";
+              currentFilename = historyName || (file.name + sheetTitle);
+              allColumns = res.columns || [];
+              columnOptions = res.options || {};
+              let blobToStore = new Blob([xhr.response], { type: 'application/octet-stream' });
               if (!currentFilename.endsWith('.parquet')) {
                 currentFilename = currentFilename.split('.')[0] + sheetTitle + '.parquet';
               }
+
+              finishStage(optimizingStageId);
+
+              const uiStageId = "UI_" + (sheetName || "") + "_" + Date.now();
+              addStage(uiStageId, "PREPARING INTERFACE");
+              progressBar.style.width = '95%';
+
+              await updateActiveDisplay();
+              renderHeader();
+              await fetchData(true);
+
+              finishStage(uiStageId);
+              progressBar.style.width = '100%';
+
+              const totalCumulativeTime = ((Date.now() - totalStartTime) / 1000).toFixed(3);
+
+              const breakdown = "Tempo de processamento:\n" + Object.keys(stages).map(id => {
+                const s = stages[id];
+                const dur = s.end ? ((s.end - s.start) / 1000).toFixed(2) : "?";
+                return `• ${s.label}: ${dur}s`;
+              }).join('\n');
+
+              if (!isHistory) {
+                const tx = db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                store.put({
+                  name: currentFilename,
+                  blob: blobToStore,
+                  date: new Date().toLocaleString(),
+                  timestamp: Date.now(),
+                  tag: file.name + sheetTitle,
+                  originalFile: file.name,
+                  sheetName: sheetName,
+                  originalSize: originalSize,
+                  importTime: res.import_time,
+                  serverTime: totalCumulativeTime,
+                  stagesBreakdown: breakdown
+                });
+                tx.oncomplete = () => loadHistory();
+              } else {
+                loadHistory();
+              }
+
+              if (!keepLoader) {
+                setTimeout(() => setLoading(false), 800);
+              }
+              resolve();
+            } catch (e) {
+              alert("Upload fail: " + e.message);
+              setLoading(false);
+              reject(e);
             }
+          } else {
+            alert("Upload failed with status: " + xhr.status);
+            setLoading(false);
+            reject(new Error(xhr.statusText));
           }
+        };
 
-          const tx = db.transaction(storeName, "readwrite");
-          tx.objectStore(storeName).put({
-            name: currentFilename,
-            blob: blobToStore,
-            date: new Date().toLocaleString(),
-            timestamp: Date.now(),
-            tag: file.name + sheetTitle,
-            originalFile: file.name,
-            sheetName: sheetName
-          });
-        }
+        xhr.onerror = () => {
+          alert("Network error during upload.");
+          setLoading(false);
+          reject(new Error("Network Error"));
+        };
 
-        await updateActiveDisplay();
-
-        document.getElementById('importTimeDisplay').style.display = 'block';
-        document.getElementById('importTimeDisplay').querySelector('.timing-value').innerText = res.import_time;
-
-        loadHistory();
-        renderHeader();
-        fetchData();
-      } catch (e) { alert("Upload fail: " + e.message); }
-      finally { setLoading(false); }
+        xhr.send(formData);
+      });
     }
+
 
     function renderHeader() {
       if (!allColumns || !Array.isArray(allColumns)) {
@@ -690,10 +824,11 @@
       fetchData();
     }
 
-    async function fetchData() {
+    async function fetchData(silent = false) {
       if (!currentSessionId) return;
       const query = document.getElementById('jqlInput').value.trim();
-      setLoading(true);
+      const startTime = Date.now();
+      if (!silent) setLoading(true);
       try {
         const res = await fetch('/fetch', {
           method: 'POST',
@@ -718,33 +853,51 @@
         const end = Math.min(currentPage * 100, res.total_count);
 
         document.getElementById('pageStats').innerText = `Exibindo ${start}-${end} de ${res.total_count.toLocaleString()}`;
-        document.getElementById('filterTimeDisplay').style.display = 'block';
-        document.getElementById('filterTimeDisplay').querySelector('.timing-value').innerText = res.filter_time;
+        const fetchTotalTime = ((Date.now() - startTime) / 1000).toFixed(3);
+        const fltDisplay = document.getElementById('filterTimeDisplay');
+        if (fltDisplay) {
+          fltDisplay.style.display = 'block';
+          fltDisplay.querySelector('.timing-value').innerText = `${res.filter_time} (Client: ${fetchTotalTime}s)`;
+        }
         document.getElementById('currentPageDisplay').innerText = `${currentPage} / ${totalPages || 1}`;
 
         if (currentAnalyzedCol) analyzeColumn(currentAnalyzedCol, true);
       } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      finally { if (!silent) setLoading(false); }
     }
 
     async function analyzeColumn(col, skipHeader = false) {
+      if (!col) return;
       currentAnalyzedCol = col;
       document.getElementById('selectedColName').innerText = col;
       if (!skipHeader) renderHeader();
-      const res = await fetch('/analyze_column', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: currentSessionId, column: col, jql_query: document.getElementById('jqlInput').value })
-      }).then(r => r.json());
 
-      document.getElementById('uniqueCountBadge').innerText = res.unique_values;
-      document.getElementById('uniqueCountBadge').style.display = 'block';
-      document.getElementById('distributionList').innerHTML = res.stats.map(s => `
-    <div class="stat-card" onclick="quickFilter('${col}', '${s.value}')">
-      <div class="d-flex justify-content-between small"><span>${s.value || 'null'}</span> <b>${s.count.toLocaleString()}</b></div>
-      <div class="stat-bar" style="width:${(s.count / res.total_rows * 100)}%"></div>
-    </div>
-  `).join('');
-      document.getElementById('appGrid').classList.remove('analyzer-hidden');
+      try {
+        const res = await fetch('/analyze_column', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSessionId, column: col, jql_query: document.getElementById('jqlInput').value })
+        }).then(r => r.json());
+
+        if (res.error) {
+          document.getElementById('appGrid').classList.add('analyzer-hidden');
+          currentAnalyzedCol = null;
+          return;
+        }
+
+        document.getElementById('uniqueCountBadge').innerText = res.unique_values;
+        document.getElementById('uniqueCountBadge').style.display = 'block';
+        document.getElementById('distributionList').innerHTML = res.stats.map(s => `
+          <div class="stat-card" onclick="quickFilter('${col}', '${s.value}')">
+            <div class="d-flex justify-content-between small"><span>${s.value || 'null'}</span> <b>${s.count.toLocaleString()}</b></div>
+            <div class="stat-bar" style="width:${(s.count / res.total_rows * 100)}%"></div>
+          </div>
+        `).join('');
+        document.getElementById('appGrid').classList.remove('analyzer-hidden');
+      } catch (e) {
+        console.error("Analysis error:", e);
+        document.getElementById('appGrid').classList.add('analyzer-hidden');
+        currentAnalyzedCol = null;
+      }
     }
 
     function quickFilter(col, val) {
@@ -836,8 +989,84 @@
     const trigger = document.getElementById('sidebarTrigger');
     trigger.onmouseenter = () => document.getElementById('appGrid').classList.remove('sidebar-hidden');
     document.getElementById('fileInput').onchange = e => processUpload(e.target.files[0]);
-    function setLoading(v) { document.getElementById('tableContainer').classList.toggle('loading', v); document.getElementById('mainLoader').style.display = v ? 'block' : 'none'; }
-    function changePage(v) { currentPage = Math.max(1, currentPage + v); fetchData(); }
+    let loaderInterval;
+    let loaderStartTime;
+    let stages = {};
+
+    function setLoading(v, text = "PROCESSING...") {
+      const container = document.getElementById('tableContainer');
+      const loader = document.getElementById('mainLoader');
+      const timerDisplay = document.getElementById('loaderTimer');
+      const textDisplay = document.getElementById('loaderText');
+      const progressBar = document.getElementById('loaderProgressBar');
+      const stagesDisplay = document.getElementById('loaderStages');
+      const progressContainer = document.getElementById('loaderProgressContainer');
+
+      container.classList.toggle('loading', v);
+      loader.style.display = v ? 'block' : 'none';
+      textDisplay.innerText = text;
+
+      if (v) {
+        loaderStartTime = Date.now();
+        stages = {};
+        stagesDisplay.innerHTML = "";
+        progressContainer.style.display = 'block';
+        loaderInterval = setInterval(() => {
+          const elapsed = ((Date.now() - loaderStartTime) / 1000).toFixed(1);
+          timerDisplay.innerText = `${elapsed}s`;
+
+          // Update active stage timer
+          Object.keys(stages).forEach(id => {
+            if (!stages[id].end) {
+              const stageElapsed = ((Date.now() - stages[id].start) / 1000).toFixed(1);
+              const el = document.getElementById(`stage-timer-${id}`);
+              if (el) el.innerText = `${stageElapsed}s`;
+            }
+          });
+        }, 100);
+      } else {
+        clearInterval(loaderInterval);
+        timerDisplay.innerText = "0.0s";
+        progressBar.style.width = '0%';
+        progressContainer.style.display = 'none';
+      }
+    }
+
+    function addStage(id, label) {
+      const stagesDisplay = document.getElementById('loaderStages');
+      const stageName = label || id;
+      stages[id] = { start: Date.now(), end: null, label: stageName };
+      stagesDisplay.innerHTML += `
+        <div class="d-flex justify-content-between mb-1 opacity-75" id="stage-${id}">
+          <span><i class="bi bi-clock-history me-2"></i>${stageName}</span>
+          <span id="stage-timer-${id}" class="text-warning">0.0s</span>
+        </div>
+      `;
+    }
+
+    function updateStage(id, label) {
+      const el = document.querySelector(`#stage-${id} span`);
+      if (el) el.innerHTML = `<i class="bi bi-clock-history me-2"></i>${label}`;
+    }
+
+    function finishStage(id) {
+      if (stages[id]) {
+        stages[id].end = Date.now();
+        const final = ((stages[id].end - stages[id].start) / 1000).toFixed(1);
+        const el = document.getElementById(`stage-${id}`);
+        const timer = document.getElementById(`stage-timer-${id}`);
+        if (el) {
+          el.classList.remove('opacity-75');
+          el.classList.add('text-success');
+          el.querySelector('i').className = 'bi bi-check-circle-fill me-2';
+        }
+        if (timer) timer.innerText = `${final}s`;
+      }
+    }
+    function changePage(v) {
+      currentPage = Math.max(1, currentPage + v);
+      fetchData(true); // silent fetch to avoid blocking loader on pagination
+    }
 
     initDB().then(loadHistory);
   </script>
