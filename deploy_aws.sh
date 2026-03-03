@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 check_command() {
@@ -9,16 +8,29 @@ check_command() {
     fi
 }
 
-echo "# Validando requisitos..."
-check_command "aws"
-check_command "docker"
+show_help() {
+    echo "Uso: $0 [opcoes]"
+    echo ""
+    echo "Opcoes:"
+    echo "  -h, --help        Mostra esta mensagem de ajuda"
+    echo "  -env=AMBIENTE     Define o ambiente (ex: dev, prod). Padrao: dev"
+    echo "  -auto-approve     Pula a confirmacao da conta AWS"
+    echo "  -skip-build       Pula a etapa de build e push do Docker"
+    echo ""
+    exit 0
+}
 
 AUTO_APPROVE=false
 ENV="dev"
+SKIP_BUILD=false
 
 for arg in "$@"; do
-    if [ "$arg" == "-auto-approve" ]; then
+    if [ "$arg" == "-h" ] || [ "$arg" == "--help" ]; then
+        show_help
+    elif [ "$arg" == "-auto-approve" ]; then
         AUTO_APPROVE=true
+    elif [ "$arg" == "-skip-build" ]; then
+        SKIP_BUILD=true
     elif [[ "$arg" == -env=* ]]; then
         ENV="${arg#*-env=}"
     fi
@@ -26,6 +38,10 @@ done
 
 CONFIG_FILE="terraform/envs/${ENV}/config.yaml"
 
+check_command "aws"
+if [ "$SKIP_BUILD" = false ]; then
+    check_command "docker"
+fi
 echo "# Ambiente selecionado: $ENV"
 
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -73,20 +89,24 @@ CLUSTER_NAME="$APP_NAME-cluster"
 SERVICE_NAME="$APP_NAME-service"
 FULL_IMAGE_NAME="$REGISTRY_URL/$ECR_REPO_NAME"
 
-echo "# --- ETAPA 1: DOCKER BUILD & PUSH ---"
-echo "# Autenticando no Amazon ECR ($REGISTRY_URL)..."
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY_URL
+if [ "$SKIP_BUILD" = false ]; then
+    echo "# --- ETAPA 1: DOCKER BUILD & PUSH ---"
+    echo "# Autenticando no Amazon ECR ($REGISTRY_URL)..."
+    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY_URL
 
-echo "# Construindo imagem Docker..."
-docker build --provenance=false -t $ECR_REPO_NAME .
+    echo "# Construindo imagem Docker..."
+    docker build --provenance=false -t $ECR_REPO_NAME .
 
-echo "# Tagging e enviando para o ECR ($IMAGE_TAG e latest)..."
-docker tag $ECR_REPO_NAME:latest $FULL_IMAGE_NAME:$IMAGE_TAG
-docker tag $ECR_REPO_NAME:latest $FULL_IMAGE_NAME:latest
+    echo "# Tagging e enviando para o ECR ($IMAGE_TAG e latest)..."
+    docker tag $ECR_REPO_NAME:latest $FULL_IMAGE_NAME:$IMAGE_TAG
+    docker tag $ECR_REPO_NAME:latest $FULL_IMAGE_NAME:latest
 
-echo "# Realizando push das tags específicas..."
-docker push $FULL_IMAGE_NAME:$IMAGE_TAG
-docker push $FULL_IMAGE_NAME:latest
+    echo "# Realizando push das tags específicas..."
+    docker push $FULL_IMAGE_NAME:$IMAGE_TAG
+    docker push $FULL_IMAGE_NAME:latest
+else
+    echo "# --- ETAPA 1: DOCKER BUILD & PUSH (PULADO) ---"
+fi
 
 echo "# --- ETAPA 2: ATUALIZANDO TASK DEFINITION ---"
 echo "# Obtendo definicao atual da Task ($APP_NAME-task)..."

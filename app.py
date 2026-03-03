@@ -48,29 +48,29 @@ def set_session_data(session_id, df):
     }
 
 def parse_jql_to_mask(df, query):
+    if not query: return pd.Series([True] * len(df))
+    
     query = query.strip()
-    while '(' in query:
-        match = re.search(r'\(([^()]+)\)', query)
-        if not match: break
-        inner_query = match.group(1)
-        break
     
     def evaluate_simple_condition(col, op, val):
-        if col not in df.columns: return pd.Series([True] * len(df))
+        if col not in df.columns: return pd.Series([False] * len(df))
         series_str = df[col].astype(str).replace(['None', 'nan', '<NA>'], '')
+        val = str(val)
         if op == "=": return (series_str == val)
         elif op == "~": return (series_str.str.contains(val, case=False, na=False))
         elif op == "!~": return ~(series_str.str.contains(val, case=False, na=False))
         return pd.Series([True] * len(df))
 
-    tokens = re.findall(r'(\w+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
+    tokens = re.findall(r'([\w\.\-]+)\s*(!?~|=)\s*"([^"]*)"|(\bAND\b|\bOR\b)', query, re.IGNORECASE)
     if not tokens: return pd.Series([True] * len(df))
+    
     final_mask = None
     last_logic = "AND"
+    
     for token in tokens:
         if token[3]:
             last_logic = token[3].upper()
-        else:
+        else: # Condition (Col Op Val)
             col, op, val = token[0], token[1], token[2]
             current_mask = evaluate_simple_condition(col, op, val)
             if final_mask is None:
@@ -78,6 +78,7 @@ def parse_jql_to_mask(df, query):
             else:
                 if last_logic == "AND": final_mask &= current_mask
                 else: final_mask |= current_mask
+                
     return final_mask if final_mask is not None else pd.Series([True] * len(df))
 
 def apply_jql(df, query):

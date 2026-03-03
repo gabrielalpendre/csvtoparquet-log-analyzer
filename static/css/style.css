@@ -1,0 +1,356 @@
+:root {
+  --element-bg: #0f171e;
+  --element-card: #1c2732;
+  --element-border: #414d5c;
+  --element-orange: #ff9900;
+  --element-sec: #232f3e;
+  --scrollbar-track: #161e27;
+  --scrollbar-thumb: #3e4b5b;
+  --scrollbar-thumb-hover: #ff9900;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+  border: 2px solid var(--scrollbar-track);
+}
+
+.progress-bar {
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+body {
+  background-color: var(--element-bg);
+  color: #ffffff;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 13px;
+  margin: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.app-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr 280px;
+  height: 100vh;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-grid.sidebar-hidden {
+  grid-template-columns: 0px 1fr 280px;
+}
+
+.app-grid.analyzer-hidden {
+  grid-template-columns: 280px 1fr 0px;
+}
+
+.app-grid.sidebar-hidden.analyzer-hidden {
+  grid-template-columns: 0px 1fr 0px;
+}
+
+.sidebar,
+.analyzer-panel {
+  background: var(--element-sec);
+  border-right: 1px solid var(--element-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1002;
+}
+
+.analyzer-panel {
+  border-right: none;
+  border-left: 1px solid var(--element-border);
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background: var(--element-bg);
+}
+
+#dropOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 153, 0, 0.4);
+  border: 4px dashed var(--element-orange);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+#dropOverlay.active {
+  display: flex;
+}
+
+.query-panel {
+  background: #161e27;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--element-border);
+  z-index: 100;
+}
+
+.menu-toggle {
+  background: transparent;
+  border: none;
+  color: var(--element-orange);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0 5px;
+}
+
+.jql-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0f171e;
+  border: 1px solid var(--element-border);
+  border-radius: 4px;
+  padding: 2px 10px;
+  transition: border-color 0.2s;
+  position: relative;
+}
+
+.jql-container:focus-within {
+  border-color: var(--element-orange);
+}
+
+.jql-input {
+  background: transparent;
+  border: none;
+  color: #00f2fe;
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  flex: 1;
+  padding: 8px;
+  outline: none;
+  resize: none;
+  height: 40px;
+  min-height: 40px;
+  max-height: 120px;
+  line-height: 1.4;
+}
+
+.file-badge {
+  background: var(--element-sec);
+  border: 1px solid var(--element-border);
+  padding: 4px 10px;
+  border-radius: 3px;
+  color: var(--element-orange);
+  font-weight: bold;
+  font-size: 12px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestions {
+  position: absolute;
+  background: #2b3948;
+  border: 1px solid var(--element-border);
+  width: 60%;
+  z-index: 2000;
+  max-height: 250px;
+  overflow-y: auto;
+  display: none;
+  margin-top: 5px;
+  border-radius: 4px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  left: 10px;
+  top: 100%;
+}
+
+.suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #3e4b5b;
+  transition: 0.2s;
+}
+
+.suggestion-item:hover {
+  background: var(--element-orange);
+  color: black;
+}
+
+.table-area {
+  flex: 1;
+  overflow: auto;
+  background: var(--element-card);
+  position: relative;
+}
+
+.table-area.loading {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.fixed-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.fixed-table th,
+.fixed-table td {
+  width: 160px;
+  min-width: 160px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-right: 1px solid #2b3948;
+  border-bottom: 1px solid #2b3948;
+  padding: 12px 10px !important;
+}
+
+.fixed-table th {
+  background: #1c2732 !important;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  color: var(--element-orange);
+  text-transform: uppercase;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.fixed-table th:hover {
+  background: #25313d !important;
+}
+
+.stat-card {
+  background: #161e27;
+  border: 1px solid #2b3948;
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.stat-card:hover {
+  border-color: var(--element-orange);
+  transform: translateX(5px);
+}
+
+.stat-card .d-flex {
+  gap: 5px;
+}
+
+.stat-bar {
+  height: 4px;
+  background: var(--element-orange);
+  border-radius: 2px;
+  margin-top: 5px;
+}
+
+.history-item {
+  border-left: 3px solid transparent;
+  transition: 0.2s;
+  position: relative;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+
+.history-item:hover {
+  background: #25313d;
+}
+
+.history-item.active {
+  border-left-color: var(--element-orange);
+  background: #2b3948;
+}
+
+.history-actions {
+  visibility: hidden;
+  gap: 8px;
+  display: flex;
+}
+
+.history-item:hover .history-actions {
+  visibility: visible;
+}
+
+.timing-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #2b3948;
+  color: #ffffff;
+  border: 1px solid #414d5c;
+}
+
+.text-secondary {
+  color: #ffffff !important;
+}
+
+.timing-value {
+  color: var(--element-orange);
+  font-weight: bold;
+}
+
+.sidebar-trigger-area {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  z-index: 1001;
+}
+
+.history-timing-hover {
+  position: relative;
+  display: inline-block;
+  text-decoration: underline dotted var(--element-orange);
+}
+
+.history-timing-hover:hover::after {
+  content: attr(data-breakdown);
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: rgba(20, 30, 40, 0.99);
+  border: 1px solid var(--element-orange);
+  padding: 12px;
+  border-radius: 8px;
+  white-space: pre-line;
+  z-index: 11000;
+  font-size: 11px;
+  color: #fff;
+  min-width: 240px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  line-height: 1.6;
+  font-family: 'Segoe UI', sans-serif;
+  text-align: left;
+}
+
+.sidebar {
+  z-index: 1050 !important;
+}
