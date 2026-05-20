@@ -1,11 +1,25 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="dark">
 
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function() {
+      var stored = null;
+      try { stored = localStorage.getItem('wm-theme-preference'); } catch(e) {}
+      var valid = ['dark', 'light'];
+      if (valid.indexOf(stored) === -1) {
+        stored = 'dark';
+        try { localStorage.setItem('wm-theme-preference', 'dark'); } catch(e) {}
+      }
+      document.documentElement.setAttribute('data-theme', stored);
+    })();
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <noscript><style>html { --wm-bg-primary: #1A1A1A; color: #EAEAEA; background-color: #1A1A1A; }</style></noscript>
   <title>Log Analyzer</title>
 </head>
 
@@ -13,8 +27,8 @@
 
   <div id="dropOverlay">
     <div class="text-center">
-      <i class="bi bi-cloud-arrow-up-fill" style="font-size: 4rem; color: var(--element-orange);"></i>
-      <h3 class="text-white mt-3">SOLTE PARA IMPORTAR</h3>
+      <i class="bi bi-cloud-arrow-up-fill" style="font-size: 4rem; color: var(--wm-primary);"></i>
+      <h3 class="mt-3" style="color: var(--wm-text-primary);">SOLTE PARA IMPORTAR</h3>
       <p class="text-secondary">(Arquivos ficam locais no Navegador)</p>
     </div>
   </div>
@@ -25,7 +39,7 @@
     <aside class="sidebar" id="sidebar">
       <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
         <div>
-          <strong class="text-warning">LOCAL HISTORY</strong><br>
+          <strong class="text-warning" style="color: var(--wm-primary) !important;">LOCAL HISTORY</strong><br>
           <small id="totalSizeDisplay" class="text-secondary" style="font-size: 11px;">Size: 0 MB</small>
         </div>
         <div class="d-flex gap-2">
@@ -37,10 +51,10 @@
         </div>
       </div>
       <div class="p-2 overflow-auto flex-grow-1" id="historyList"></div>
-      <div class="p-3 border-top border-secondary bg-dark">
-        <label class="btn btn-sm btn-outline-warning w-100">
+      <div class="p-3 border-top border-secondary" style="background: var(--wm-bg-card);">
+        <label class="btn btn-sm w-100" style="color: var(--wm-primary); border: 1px solid var(--wm-primary);">
           <i class="bi bi-plus-lg"></i> UPLOAD FILE
-          <input type="file" id="fileInput" hidden accept=".csv,.parquet,.xlsx">
+          <input type="file" id="fileInput" hidden accept=".csv,.parquet,.xlsx,.json,.xml">
         </label>
       </div>
     </aside>
@@ -71,39 +85,45 @@
 
           <button class="btn btn-sm btn-outline-success" onclick="exportToExcel()"><i
               class="bi bi-file-earmark-excel"></i> EXPORT</button>
+          <button class="theme-toggle" 
+                  onclick="ThemeManager.toggle()" 
+                  aria-label="Alternar tema"
+                  title="Alternar tema">
+            <i class="bi bi-moon-fill" id="themeIcon"></i>
+          </button>
           <button class="menu-toggle" onclick="toggleAnalyzer()"><i class="bi bi-graph-up"></i></button>
         </div>
       </header>
 
       <section class="table-area" id="tableContainer">
         <div id="mainLoader"
-          style="display:none; position: absolute; top:50%; left:50%; translate: -50% -50%; z-index: 2001; background: rgba(15, 23, 30, 0.95); padding: 25px; border-radius: 8px; border: 1px solid var(--element-border); min-width: 320px;"
-          class="text-center text-warning">
-          <div class="spinner-border text-warning mb-3"></div>
+          style="display:none; position: absolute; top:50%; left:50%; translate: -50% -50%; z-index: 2001; background: var(--wm-bg-card, rgba(15, 23, 30, 0.95)); padding: 25px; border-radius: 8px; border: 1px solid var(--wm-border); min-width: 320px; color: var(--wm-primary);"
+          class="text-center">
+          <div class="spinner-border mb-3" style="color: var(--wm-primary);"></div>
           <div class="h5 fw-bold mb-1" id="loaderText">PROCESSING...</div>
           <div id="loaderTimer" class="h4 fw-light mb-3">0.0s</div>
 
-          <div class="progress mb-3" style="height: 8px; background: #2b3948;" id="loaderProgressContainer">
-            <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" role="progressbar"
-              id="loaderProgressBar" style="width: 0%"></div>
+          <div class="progress mb-3" style="height: 8px; background: var(--wm-neutral-300, #2b3948);" id="loaderProgressContainer">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+              id="loaderProgressBar" style="width: 0%; background-color: var(--wm-primary);"></div>
           </div>
 
           <div id="loaderStages" class="text-start border-top border-secondary pt-3 mt-2"
             style="font-size: 11px; max-height: 150px; overflow-y: auto;">
           </div>
         </div>
-        <table class="table table-dark fixed-table mb-0">
+        <table class="table fixed-table mb-0">
           <thead id="headerRow"></thead>
           <tbody id="tableBody"></tbody>
         </table>
       </section>
 
-      <footer class="p-2 border-top border-secondary d-flex justify-content-between align-items-center bg-dark">
+      <footer class="p-2 border-top border-secondary d-flex justify-content-between align-items-center" style="background: var(--wm-bg-card);">
         <div id="pageStats" class="text-secondary ps-2">Objects: 0</div>
         <div class="d-flex gap-3 align-items-center pe-2">
           <button class="btn btn-sm btn-outline-secondary py-0" onclick="changePage(-1)"><i
               class="bi bi-chevron-left"></i></button>
-          <span class="text-warning fw-bold" id="currentPageDisplay">1</span>
+          <span class="fw-bold" id="currentPageDisplay" style="color: var(--wm-primary);">1</span>
           <button class="btn btn-sm btn-outline-secondary py-0" onclick="changePage(1)"><i
               class="bi bi-chevron-right"></i></button>
         </div>
@@ -112,18 +132,30 @@
 
     <aside class="analyzer-panel" id="analyzerPanel">
       <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
-        <strong class="text-warning">DISTRIBUTION</strong>
-        <button class="btn btn-sm text-secondary" onclick="toggleAnalyzer()"><i class="bi bi-x-lg"></i></button>
+        <strong class="text-warning" style="color: var(--wm-primary) !important;">DISTRIBUTION</strong>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm text-secondary" onclick="exportDistributionCSV()" title="Download CSV">
+            <i class="bi bi-download"></i>
+          </button>
+          <button class="btn btn-sm text-secondary" onclick="toggleAnalyzer()"><i class="bi bi-x-lg"></i></button>
+        </div>
       </div>
       <div id="selectedColDisplay"
-        class="p-2 border-bottom border-secondary bg-dark d-flex justify-content-between align-items-center">
+        class="p-2 border-bottom border-secondary d-flex justify-content-between align-items-center" style="background: var(--wm-bg-card);">
         <span id="selectedColName" class="text-truncate fw-bold">Select a column</span>
-        <span id="uniqueCountBadge" class="badge bg-warning text-dark" style="display:none">0</span>
+        <span id="uniqueCountBadge" class="badge text-white" style="display:none; background-color: var(--wm-primary);">0</span>
       </div>
       <div class="p-2 overflow-auto flex-grow-1" id="distributionList"></div>
     </aside>
   </div>
 
+  <div id="columnContextMenu" class="context-menu" style="display:none;">
+    <div class="context-menu-item" data-action="split">
+      <i class="bi bi-scissors"></i> Split Column by Delimiter
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
   <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 

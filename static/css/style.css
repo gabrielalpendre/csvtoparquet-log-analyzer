@@ -1,12 +1,126 @@
-:root {
-  --element-bg: #0f171e;
-  --element-card: #1c2732;
-  --element-border: #414d5c;
-  --element-orange: #ff9900;
-  --element-sec: #232f3e;
-  --scrollbar-track: #161e27;
-  --scrollbar-thumb: #3e4b5b;
-  --scrollbar-thumb-hover: #ff9900;
+/* ==========================================================================
+   Webmotors Theme System - CSS Custom Properties
+   Uses [data-theme] attribute on <html> for theme resolution.
+   Dark mode is the default fallback when JS is disabled.
+   ========================================================================== */
+
+/* Dark Theme (default) */
+[data-theme="dark"] {
+  /* Background surfaces */
+  --wm-bg-primary: #1A1A1A;
+  --wm-bg-card: #2D2D2D;
+  --wm-bg-panel: #1A1A1A;
+  --wm-bg-input: #1A1A1A;
+  --wm-bg-table-header: #1A1A1A;
+  --wm-bg-table-row: #2D2D2D;
+
+  /* Borders */
+  --wm-border: #4D4D4D;
+  --wm-border-subtle: #3D3D3D;
+
+  /* Text */
+  --wm-text-primary: #EAEAEA;
+  --wm-text-secondary: #B0B0B0;
+
+  /* Brand / Primary */
+  --wm-primary: #E00000;
+  --wm-primary-hover: #FF1A1A;
+
+  /* Accents */
+  --wm-accent-1: #EAEAEA;
+  --wm-accent-2: #4CAF50;
+
+  /* Neutral scale */
+  --wm-neutral-100: #1A1A1A;
+  --wm-neutral-200: #2D2D2D;
+  --wm-neutral-300: #3D3D3D;
+  --wm-neutral-400: #4D4D4D;
+  --wm-neutral-500: #6B6B6B;
+
+  /* Scrollbar */
+  --wm-scrollbar-track: #1A1A1A;
+  --wm-scrollbar-thumb: #4D4D4D;
+
+  /* Shadow */
+  --wm-shadow: none;
+
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  /* Background surfaces */
+  --wm-bg-primary: #FFFFFF;
+  --wm-bg-card: #F5F5F5;
+  --wm-bg-panel: #EBEBEB;
+  --wm-bg-input: #FFFFFF;
+  --wm-bg-table-header: #E0E0E0;
+  --wm-bg-table-row: #FFFFFF;
+
+  /* Borders */
+  --wm-border: #E0E0E0;
+  --wm-border-subtle: #EEEEEE;
+
+  /* Text */
+  --wm-text-primary: #1A1A1A;
+  --wm-text-secondary: #4A4A4A;
+
+  /* Brand / Primary */
+  --wm-primary: #E00000;
+  --wm-primary-hover: #CC0000;
+
+  /* Accents */
+  --wm-accent-1: #333333;
+  --wm-accent-2: #4CAF50;
+
+  /* Neutral scale */
+  --wm-neutral-100: #FFFFFF;
+  --wm-neutral-200: #F5F5F5;
+  --wm-neutral-300: #E0E0E0;
+  --wm-neutral-400: #BDBDBD;
+  --wm-neutral-500: #757575;
+
+  /* Scrollbar */
+  --wm-scrollbar-track: #F5F5F5;
+  --wm-scrollbar-thumb: #BDBDBD;
+
+  /* Shadow */
+  --wm-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+}
+
+/* Spacing Scale (4px base unit) - shared across both themes */
+[data-theme="dark"],
+[data-theme="light"] {
+  --wm-space-xs: 4px;
+  --wm-space-sm: 8px;
+  --wm-space-md: 12px;
+  --wm-space-lg: 16px;
+  --wm-space-xl: 24px;
+  --wm-space-2xl: 32px;
+}
+
+/* Typography Scale - shared across both themes */
+[data-theme="dark"],
+[data-theme="light"] {
+  --wm-font-family: "Inter", "Roboto", "Segoe UI", sans-serif;
+  --wm-font-size-caption: 11px;
+  --wm-font-size-body: 13px;
+  --wm-font-size-label: 14px;
+  --wm-font-size-h3: 16px;
+  --wm-font-size-h2: 20px;
+  --wm-font-size-h1: 24px;
+  --wm-line-height-body: 1.4;
+  --wm-line-height-heading: 1.2;
+}
+
+/* Smooth theme transition (300ms as per requirements) */
+*,
+*::before,
+*::after {
+  transition: background-color 300ms ease,
+              color 300ms ease,
+              border-color 300ms ease,
+              box-shadow 300ms ease;
 }
 
 ::-webkit-scrollbar {
@@ -15,13 +129,17 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
+  background: var(--wm-scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
+  background: var(--wm-scrollbar-thumb);
   border-radius: 4px;
-  border: 2px solid var(--scrollbar-track);
+  border: 2px solid var(--wm-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wm-primary);
 }
 
 .progress-bar {
@@ -30,14 +148,15 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-color: var(--wm-scrollbar-thumb) var(--wm-scrollbar-track);
 }
 
 body {
-  background-color: var(--element-bg);
-  color: #ffffff;
-  font-family: 'Segoe UI', sans-serif;
-  font-size: 13px;
+  background-color: var(--wm-bg-primary);
+  color: var(--wm-text-primary);
+  font-family: var(--wm-font-family);
+  font-size: var(--wm-font-size-body);
+  line-height: var(--wm-line-height-body);
   margin: 0;
   overflow: hidden;
   height: 100vh;
@@ -64,18 +183,20 @@ body {
 
 .sidebar,
 .analyzer-panel {
-  background: var(--element-sec);
-  border-right: 1px solid var(--element-border);
+  background: var(--wm-bg-panel);
+  border-right: 1px solid var(--wm-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   z-index: 1002;
+  border-radius: 0;
+  box-shadow: var(--wm-shadow);
 }
 
 .analyzer-panel {
   border-right: none;
-  border-left: 1px solid var(--element-border);
+  border-left: 1px solid var(--wm-border);
 }
 
 .main-content {
@@ -83,7 +204,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  background: var(--element-bg);
+  background: var(--wm-bg-primary);
 }
 
 #dropOverlay {
@@ -92,8 +213,8 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(255, 153, 0, 0.4);
-  border: 4px dashed var(--element-orange);
+  background: rgba(224, 0, 0, 0.15);
+  border: 4px dashed var(--wm-primary);
   z-index: 9999;
   display: none;
   align-items: center;
@@ -107,61 +228,63 @@ body {
 }
 
 .query-panel {
-  background: #161e27;
-  padding: 10px 15px;
-  border-bottom: 1px solid var(--element-border);
+  background: var(--wm-bg-card);
+  padding: var(--wm-space-sm) var(--wm-space-lg);
+  border-bottom: 1px solid var(--wm-border);
   z-index: 100;
+  box-shadow: var(--wm-shadow);
 }
 
 .menu-toggle {
   background: transparent;
   border: none;
-  color: var(--element-orange);
+  color: var(--wm-primary);
   font-size: 1.4rem;
   cursor: pointer;
-  padding: 0 5px;
+  padding: 0 var(--wm-space-xs);
+  border-radius: 4px;
 }
 
 .jql-container {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: #0f171e;
-  border: 1px solid var(--element-border);
+  gap: var(--wm-space-sm);
+  background: var(--wm-bg-input);
+  border: 1px solid var(--wm-border);
   border-radius: 4px;
-  padding: 2px 10px;
+  padding: 2px var(--wm-space-sm);
   transition: border-color 0.2s;
   position: relative;
 }
 
 .jql-container:focus-within {
-  border-color: var(--element-orange);
+  border-color: var(--wm-primary);
 }
 
 .jql-input {
   background: transparent;
   border: none;
-  color: #00f2fe;
+  color: var(--wm-accent-1);
   font-family: 'Courier New', monospace;
   font-size: 15px;
   flex: 1;
-  padding: 8px;
+  padding: var(--wm-space-sm);
   outline: none;
   resize: none;
   height: 40px;
   min-height: 40px;
   max-height: 120px;
-  line-height: 1.4;
+  line-height: var(--wm-line-height-body);
 }
 
 .file-badge {
-  background: var(--element-sec);
-  border: 1px solid var(--element-border);
-  padding: 4px 10px;
-  border-radius: 3px;
-  color: var(--element-orange);
+  background: var(--wm-bg-panel);
+  border: 1px solid var(--wm-border);
+  padding: var(--wm-space-xs) var(--wm-space-sm);
+  border-radius: 4px;
+  color: var(--wm-primary);
   font-weight: bold;
-  font-size: 12px;
+  font-size: var(--wm-font-size-caption);
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -170,37 +293,41 @@ body {
 
 .suggestions {
   position: absolute;
-  background: #2b3948;
-  border: 1px solid var(--element-border);
+  background: var(--wm-bg-card);
+  border: 1px solid var(--wm-border);
   width: 60%;
   z-index: 2000;
   max-height: 250px;
   overflow-y: auto;
   display: none;
-  margin-top: 5px;
-  border-radius: 4px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  margin-top: var(--wm-space-xs);
+  border-radius: 8px;
+  box-shadow: var(--wm-shadow);
   left: 10px;
   top: 100%;
 }
 
 .suggestion-item {
-  padding: 8px 12px;
+  padding: var(--wm-space-sm) var(--wm-space-md);
   cursor: pointer;
-  border-bottom: 1px solid #3e4b5b;
+  border-bottom: 1px solid var(--wm-border-subtle);
   transition: 0.2s;
+  color: var(--wm-text-primary);
+  font-size: var(--wm-font-size-body);
 }
 
 .suggestion-item:hover {
-  background: var(--element-orange);
-  color: black;
+  background: var(--wm-primary);
+  color: #ffffff;
 }
 
 .table-area {
   flex: 1;
   overflow: auto;
-  background: var(--element-card);
+  background: var(--wm-bg-card);
   position: relative;
+  border-radius: 8px;
+  box-shadow: var(--wm-shadow);
 }
 
 .table-area.loading {
@@ -209,65 +336,97 @@ body {
 }
 
 .fixed-table {
-  table-layout: fixed;
-  width: 100%;
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  /* Override Bootstrap .table variables to use our theme */
+  --bs-table-bg: var(--wm-bg-card);
+  --bs-table-color: var(--wm-text-primary);
+  --bs-table-border-color: var(--wm-border-subtle);
+  --bs-table-striped-bg: var(--wm-bg-card);
+  --bs-table-hover-bg: var(--wm-neutral-200);
+  --bs-table-hover-color: var(--wm-text-primary);
+  background-color: var(--wm-bg-card) !important;
+  color: var(--wm-text-primary) !important;
 }
 
 .fixed-table th,
 .fixed-table td {
-  width: 160px;
-  min-width: 160px;
-  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-right: 1px solid #2b3948;
-  border-bottom: 1px solid #2b3948;
-  padding: 12px 10px !important;
+  border-right: 1px solid var(--wm-border);
+  border-bottom: 1px solid var(--wm-border);
+  padding: var(--wm-space-md) var(--wm-space-sm) !important;
+  font-size: var(--wm-font-size-body);
+  color: var(--wm-text-primary);
+  background-color: var(--wm-bg-table-row) !important;
+  max-width: 400px;
 }
 
 .fixed-table th {
-  background: #1c2732 !important;
+  background: var(--wm-bg-table-header) !important;
   position: sticky;
   top: 0;
   z-index: 20;
-  color: var(--element-orange);
+  color: var(--wm-text-primary);
   text-transform: uppercase;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--wm-font-size-caption);
+  font-weight: 600;
   letter-spacing: 0.5px;
+  position: relative;
+  user-select: none;
 }
 
 .fixed-table th:hover {
-  background: #25313d !important;
+  background: var(--wm-neutral-400) !important;
+}
+
+/* Column resize handle */
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 21;
+}
+
+.col-resize-handle:hover,
+.col-resize-handle.active {
+  background: var(--wm-primary);
 }
 
 .stat-card {
-  background: #161e27;
-  border: 1px solid #2b3948;
-  padding: 8px;
-  border-radius: 4px;
-  margin-bottom: 5px;
+  background: var(--wm-bg-card);
+  border: 1px solid var(--wm-border);
+  padding: var(--wm-space-sm);
+  border-radius: 8px;
+  margin-bottom: var(--wm-space-xs);
   cursor: pointer;
   transition: 0.2s;
+  box-shadow: var(--wm-shadow);
 }
 
 .stat-card:hover {
-  border-color: var(--element-orange);
+  border-color: var(--wm-primary);
   transform: translateX(5px);
 }
 
 .stat-card .d-flex {
-  gap: 5px;
+  gap: var(--wm-space-xs);
 }
 
 .stat-bar {
   height: 4px;
-  background: var(--element-orange);
+  background: var(--wm-primary);
   border-radius: 2px;
-  margin-top: 5px;
+  margin-top: var(--wm-space-xs);
 }
 
 .history-item {
@@ -276,20 +435,21 @@ body {
   position: relative;
   cursor: pointer;
   margin-bottom: 2px;
+  padding: var(--wm-space-xs) var(--wm-space-sm);
 }
 
 .history-item:hover {
-  background: #25313d;
+  background: var(--wm-neutral-200);
 }
 
 .history-item.active {
-  border-left-color: var(--element-orange);
-  background: #2b3948;
+  border-left-color: var(--wm-primary);
+  background: var(--wm-neutral-300);
 }
 
 .history-actions {
   visibility: hidden;
-  gap: 8px;
+  gap: var(--wm-space-sm);
   display: flex;
 }
 
@@ -298,20 +458,20 @@ body {
 }
 
 .timing-badge {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: #2b3948;
-  color: #ffffff;
-  border: 1px solid #414d5c;
+  font-size: var(--wm-font-size-caption);
+  padding: 2px var(--wm-space-xs);
+  border-radius: 4px;
+  background: var(--wm-neutral-200);
+  color: var(--wm-text-primary);
+  border: 1px solid var(--wm-border);
 }
 
 .text-secondary {
-  color: #ffffff !important;
+  color: var(--wm-text-secondary) !important;
 }
 
 .timing-value {
-  color: var(--element-orange);
+  color: var(--wm-primary);
   font-weight: bold;
 }
 
@@ -327,7 +487,7 @@ body {
 .history-timing-hover {
   position: relative;
   display: inline-block;
-  text-decoration: underline dotted var(--element-orange);
+  text-decoration: underline dotted var(--wm-primary);
 }
 
 .history-timing-hover:hover::after {
@@ -335,22 +495,255 @@ body {
   position: absolute;
   right: 0;
   top: 100%;
-  background: rgba(20, 30, 40, 0.99);
-  border: 1px solid var(--element-orange);
-  padding: 12px;
+  background: var(--wm-bg-card);
+  border: 1px solid var(--wm-primary);
+  padding: var(--wm-space-md);
   border-radius: 8px;
   white-space: pre-line;
   z-index: 11000;
-  font-size: 11px;
-  color: #fff;
+  font-size: var(--wm-font-size-caption);
+  color: var(--wm-text-primary);
   min-width: 240px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  box-shadow: var(--wm-shadow);
   pointer-events: none;
   line-height: 1.6;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: var(--wm-font-family);
   text-align: left;
 }
 
 .sidebar {
   z-index: 1050 !important;
+}
+
+/* ==========================================================================
+   Typography - Headings
+   ========================================================================== */
+
+h1, .h1 {
+  font-size: var(--wm-font-size-h1);
+  font-weight: 600;
+  line-height: var(--wm-line-height-heading);
+  color: var(--wm-text-primary);
+}
+
+h2, .h2 {
+  font-size: var(--wm-font-size-h2);
+  font-weight: 600;
+  line-height: var(--wm-line-height-heading);
+  color: var(--wm-text-primary);
+}
+
+h3, .h3 {
+  font-size: var(--wm-font-size-h3);
+  font-weight: 600;
+  line-height: var(--wm-line-height-heading);
+  color: var(--wm-text-primary);
+}
+
+/* ==========================================================================
+   Loader Overlay
+   ========================================================================== */
+
+.loader-overlay {
+  background: var(--wm-bg-card);
+  border: 1px solid var(--wm-border);
+  border-radius: 8px;
+  padding: var(--wm-space-xl);
+  box-shadow: var(--wm-shadow);
+  color: var(--wm-text-primary);
+}
+
+.loader-overlay .progress-bar {
+  background: var(--wm-primary);
+}
+
+/* ==========================================================================
+   Theme Toggle Button
+   ========================================================================== */
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--wm-border);
+  color: var(--wm-text-primary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: var(--wm-space-xs);
+  border-radius: 4px;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.theme-toggle:hover {
+  border-color: var(--wm-primary);
+  background: var(--wm-neutral-200);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--wm-primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Pagination Controls
+   ========================================================================== */
+
+.pagination button,
+.pagination input {
+  border-radius: 4px;
+  padding: var(--wm-space-xs) var(--wm-space-sm);
+  border: 1px solid var(--wm-border);
+  background: var(--wm-bg-input);
+  color: var(--wm-text-primary);
+  font-size: var(--wm-font-size-body);
+}
+
+.pagination button:hover {
+  border-color: var(--wm-primary);
+  background: var(--wm-neutral-200);
+}
+
+/* ==========================================================================
+   Labels and Captions
+   ========================================================================== */
+
+label, .label {
+  font-size: var(--wm-font-size-label);
+  color: var(--wm-text-primary);
+  font-weight: 600;
+}
+
+.caption {
+  font-size: var(--wm-font-size-caption);
+  color: var(--wm-text-secondary);
+}
+
+/* ==========================================================================
+   Bootstrap Overrides - Align with Webmotors theme
+   ========================================================================== */
+
+.text-warning {
+  color: var(--wm-primary) !important;
+}
+
+/* Force Bootstrap .table to respect our theme variables */
+.table {
+  --bs-table-bg: var(--wm-bg-card);
+  --bs-table-color: var(--wm-text-primary);
+  --bs-table-border-color: var(--wm-border-subtle);
+  --bs-table-striped-bg: var(--wm-neutral-200);
+  --bs-table-hover-bg: var(--wm-neutral-200);
+  --bs-table-hover-color: var(--wm-text-primary);
+  --bs-table-active-bg: var(--wm-neutral-300);
+  --bs-table-active-color: var(--wm-text-primary);
+  color: var(--wm-text-primary);
+  border-color: var(--wm-border-subtle);
+}
+
+.table > :not(caption) > * > * {
+  background-color: var(--wm-bg-table-row) !important;
+  color: var(--wm-text-primary) !important;
+  border-bottom-color: var(--wm-border) !important;
+}
+
+.table > thead > * > * {
+  background-color: var(--wm-bg-table-header) !important;
+  color: var(--wm-text-primary) !important;
+}
+
+
+/* ==========================================================================
+   Type Indicator in Column Headers
+   ========================================================================== */
+
+.type-indicator {
+    opacity: 0.5;
+    margin-right: 4px;
+    font-size: 0.8em;
+    transition: opacity 0.2s ease;
+}
+
+.type-indicator:hover {
+    opacity: 1;
+}
+
+/* ==========================================================================
+   Context Menu
+   ========================================================================== */
+
+.context-menu {
+  position: fixed;
+  background: var(--wm-bg-card);
+  border: 1px solid var(--wm-border);
+  border-radius: 6px;
+  box-shadow: var(--wm-shadow);
+  z-index: 9000;
+  min-width: 200px;
+}
+
+.context-menu-item {
+  padding: var(--wm-space-sm) var(--wm-space-md);
+  cursor: pointer;
+  color: var(--wm-text-primary);
+  font-size: var(--wm-font-size-body);
+}
+
+.context-menu-item:hover {
+  background: var(--wm-primary);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Split Indicator on Column Header
+   ========================================================================== */
+
+.split-indicator {
+  color: var(--wm-accent-2);
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+/* ==========================================================================
+   Filter Button in Stat Cards
+   ========================================================================== */
+
+.filter-btn {
+  opacity: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--wm-text-secondary);
+  border-radius: 4px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 10px;
+  cursor: pointer;
+  transition: opacity 0.1s, border-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-card:hover .filter-btn {
+  opacity: 1;
+}
+
+.filter-btn:hover {
+  border-color: var(--wm-primary);
+  color: var(--wm-primary);
+}
+
+.filter-btn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--wm-primary);
+  outline-offset: 2px;
+}
+
+/* Touch devices: always show filter button */
+@media (hover: none) {
+  .filter-btn {
+    opacity: 1;
+  }
 }

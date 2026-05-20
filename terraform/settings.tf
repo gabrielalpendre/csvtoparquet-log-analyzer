@@ -18,6 +18,7 @@ provider "aws" {
       OwnerTeam     = "infra-cloud"
       ManagedBy = "Terraform"
       Application = "log-analyzer"
+      AutoStartStop = "1"
     }
   }
 }
