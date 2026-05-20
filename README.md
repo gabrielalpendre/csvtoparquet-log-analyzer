@@ -23,12 +23,6 @@ A aplicação utiliza uma abordagem híbrida de alta performance e segurança:
 - **Excel Multitab:** Processamento coeso de arquivos com múltiplas abas em um único fluxo de importação.
 - **Progress Tracking:** Barra de progresso em tempo real que reflete cada micro-etapa (Upload, Otimização e Interface).
 
-### Interface e Experiência
-- **Design Premium:** Interface Dark Mode com fidelidade visual, micro-animações e painéis retráteis.
-- **Histórico Inteligente:** Sidebar com agrupamento de arquivos, suporte a renomeação (Tags) e exclusão em lote.
-- **Timing Breakdown:** Ao passar o mouse sobre o tempo de processamento no histórico, um tooltip detalhado exibe o tempo exato gasto em cada etapa técnica.
-- **Navegação Silenciosa:** Troca de páginas e filtros rápidos sem bloqueio de interface (Silent Fetching).
-
 ### Segurança Avançada
 - **Sessões Efêmeras:** Limite estrito de **8 horas** por sessão.
 - **Proteção Anti-Hijacking:** Cada sessão é vinculada à identidade do usuário (IP + User-Agent). O acesso é negado se houver tentativa de roubo de sessão.
@@ -57,7 +51,6 @@ terraform init -backend-config=envs/dev/backend.tf
 1. Certifique-se de ter o Docker instalado.
 2. Execute: `docker-compose up --build`
 3. A aplicação estará disponível em: `http://localhost:5001`
-   - *Nota: O código local está montado como volume. Alterações no Python ou HTML serão refletidas instantaneamente (hot-reload).*
 
 ### Produção (AWS)
 A aplicação está preparada para rodar em clusters ECS operando em modo stateless total. Certifique-se de configurar a `SECRET_KEY` via variável de ambiente.
